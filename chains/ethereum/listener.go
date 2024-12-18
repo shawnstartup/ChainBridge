@@ -128,7 +128,12 @@ func (l *listener) pollBlocks() error {
 			}
 
 			// Parse out events
-			err = l.getDepositEventsForBlock(currentBlock)
+			endBlock := new(big.Int).Add(currentBlock, big.NewInt(int64(l.blockConfirmations.Int64()-1)))
+			if endBlock.Cmp(latestBlock) == 1 {
+				endBlock = latestBlock
+			}
+
+			err = l.getDepositEventsForBlock(currentBlock, endBlock)
 			if err != nil {
 				l.log.Error("Failed to get events for block", "block", currentBlock, "err", err)
 				retry--
@@ -136,7 +141,7 @@ func (l *listener) pollBlocks() error {
 			}
 
 			// Write to block store. Not a critical operation, no need to retry
-			err = l.blockstore.StoreBlock(currentBlock)
+			err = l.blockstore.StoreBlock(endBlock)
 			if err != nil {
 				l.log.Error("Failed to write latest block to blockstore", "block", currentBlock, "err", err)
 			}
@@ -157,9 +162,9 @@ func (l *listener) pollBlocks() error {
 }
 
 // getDepositEventsForBlock looks for the deposit event in the latest block
-func (l *listener) getDepositEventsForBlock(latestBlock *big.Int) error {
-	l.log.Debug("Querying block for deposit events", "block", latestBlock)
-	query := buildQuery(l.cfg.bridgeContract, utils.Deposit, latestBlock, latestBlock)
+func (l *listener) getDepositEventsForBlock(startBlock *big.Int, endBlock *big.Int) error {
+	l.log.Debug("Querying block for deposit events", "block", startBlock)
+	query := buildQuery(l.cfg.bridgeContract, utils.Deposit, startBlock, endBlock)
 
 	// querying for logs
 	logs, err := l.conn.Client().FilterLogs(context.Background(), query)
