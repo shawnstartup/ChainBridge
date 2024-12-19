@@ -158,12 +158,14 @@ func run(ctx *cli.Context) error {
 		_, err = json.Marshal(body)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
+			return
 		}
 
 		var coSignerCallBack cosigner.CoSignerCallBack
 
 		if err := json.Unmarshal(body, &coSignerCallBack); err != nil {
 			http.Error(w, err.Error(), 400)
+			return
 		}
 
 		coSignerBizContent, _ := coSignerConverter.RequestConvert(coSignerCallBack)
@@ -174,7 +176,10 @@ func run(ctx *cli.Context) error {
 
 		if err := json.Unmarshal([]byte(coSignerBizContent), &coSignerCallBackBizContent); err != nil {
 			http.Error(w, err.Error(), 400)
+			log.Error(fmt.Sprintf("Unmarshal coSignerBizContent err : %s", err.Error()))
+			return
 		}
+		log.Info(fmt.Sprintf("coSignerCallBackBizContent.CustomerContent.TxKey: %s", coSignerCallBackBizContent.CustomerContent.TxKey))
 
 		var coSignerResponse cosigner.CoSignerResponse
 		coSignerResponse.Approve = true
@@ -184,6 +189,7 @@ func run(ctx *cli.Context) error {
 		resp, err := json.Marshal(encryptResponse)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
+			log.Error(fmt.Sprintf("Marshal encryptResponse err : %s", err.Error()))
 			return
 		}
 		log.Info(string(resp))
