@@ -53,6 +53,29 @@ var (
 	Version = "0.0.1"
 )
 
+type CoSignerCallBackBizContent struct {
+	TxKey                  string  `json:"txKey"`
+	CoinKey                string  `json:"coinKey"`
+	TxAmount               float64 `json:"txAmount"`
+	TransactionType        string  `json:"transactionType"`
+	SourceAccountKey       string  `json:"sourceAccountKey"`
+	SourceAccountType      string  `json:"sourceAccountType"`
+	SourceAddress          string  `json:"sourceAddress"`
+	DestinationAccountKey  string  `json:"destinationAccountKey"`
+	DestinationAccountType string  `json:"destinationAccountType"`
+	DestinationAddress     string  `json:"destinationAddress"`
+	VaultTxDirection       string  `json:"vaultTxDirection"`
+	TransactionStatus      string  `json:"transactionStatus"`
+	CreateTime             uint64  `json:"createTime"`
+	CreatedByUserKey       string  `json:"createdByUserKey"`
+	TxFee                  float64 `json:"txFee"`
+	FeeCoinKey             string  `json:"feeCoinKey"`
+	CustomerRefId          string  `json:"customerRefId"`
+	AmlLock                string  `json:"amlLock"`
+	TransactionDirection   string  `json:"transactionDirection"`
+	EstimateFee            float64 `json:"estimateFee"`
+}
+
 // init initializes CLI
 func init() {
 	app.Action = run
@@ -143,17 +166,23 @@ func run(ctx *cli.Context) error {
 		//According to different types of CoSignerCallBack, the customer handles the corresponding type of business logic.
 		log.Info(fmt.Sprintf("coSignerBizContent: %s", coSignerBizContent))
 
+		var coSignerCallBackBizContent CoSignerCallBackBizContent
+
+		if err := json.Unmarshal([]byte(coSignerBizContent), &coSignerCallBackBizContent); err != nil {
+			http.Error(w, err.Error(), 400)
+		}
+
 		var coSignerResponse cosigner.CoSignerResponse
 		coSignerResponse.Approve = true
-		coSignerResponse.TxKey = coSignerCallBack.Key
+		coSignerResponse.TxKey = coSignerCallBackBizContent.TxKey
 		encryptResponse, _ := coSignerConverter.ResponseConverterWithNewCryptoType(coSignerResponse)
-		log.Info(fmt.Sprintf("encryptResponse: %s", encryptResponse))
+		log.Debug(fmt.Sprintf("encryptResponse: %s", encryptResponse))
 		resp, err := json.Marshal(encryptResponse)
-		log.Info(string(resp), err)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		log.Info(string(resp))
 		w.Write(resp)
 	})
 
