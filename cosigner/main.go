@@ -56,7 +56,7 @@ var (
 type CustomerContent struct {
 	TxKey                  string  `json:"txKey"`
 	CoinKey                string  `json:"coinKey"`
-	TxAmount               float64 `json:"txAmount"`
+	TxAmount               string  `json:"txAmount"`
 	TransactionType        string  `json:"transactionType"`
 	SourceAccountKey       string  `json:"sourceAccountKey"`
 	SourceAccountType      string  `json:"sourceAccountType"`
@@ -73,7 +73,7 @@ type CustomerContent struct {
 	CustomerRefId          string  `json:"customerRefId"`
 	AmlLock                string  `json:"amlLock"`
 	TransactionDirection   string  `json:"transactionDirection"`
-	EstimateFee            float64 `json:"estimateFee"`
+	EstimateFee            string  `json:"estimateFee"`
 }
 type CoSignerCallBackBizContent struct {
 	Type            string          `json:"type"`
