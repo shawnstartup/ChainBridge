@@ -53,7 +53,7 @@ var (
 	Version = "0.0.1"
 )
 
-type CoSignerCallBackBizContent struct {
+type CustomerContent struct {
 	TxKey                  string  `json:"txKey"`
 	CoinKey                string  `json:"coinKey"`
 	TxAmount               float64 `json:"txAmount"`
@@ -74,6 +74,10 @@ type CoSignerCallBackBizContent struct {
 	AmlLock                string  `json:"amlLock"`
 	TransactionDirection   string  `json:"transactionDirection"`
 	EstimateFee            float64 `json:"estimateFee"`
+}
+type CoSignerCallBackBizContent struct {
+	Type            string          `json:"type"`
+	CustomerContent CustomerContent `json:"customerContent"`
 }
 
 // init initializes CLI
@@ -174,7 +178,7 @@ func run(ctx *cli.Context) error {
 
 		var coSignerResponse cosigner.CoSignerResponse
 		coSignerResponse.Approve = true
-		coSignerResponse.TxKey = coSignerCallBackBizContent.TxKey
+		coSignerResponse.TxKey = coSignerCallBackBizContent.CustomerContent.TxKey
 		encryptResponse, _ := coSignerConverter.ResponseConverterWithNewCryptoType(coSignerResponse)
 		log.Debug(fmt.Sprintf("encryptResponse: %s", encryptResponse))
 		resp, err := json.Marshal(encryptResponse)
