@@ -141,13 +141,13 @@ func run(ctx *cli.Context) error {
 
 		coSignerBizContent, _ := coSignerConverter.RequestConvert(coSignerCallBack)
 		//According to different types of CoSignerCallBack, the customer handles the corresponding type of business logic.
-		log.Info("coSignerBizContent: %s", coSignerBizContent)
+		log.Info(fmt.Sprintf("coSignerBizContent: %s", coSignerBizContent))
 
 		var coSignerResponse cosigner.CoSignerResponse
 		coSignerResponse.Approve = true
 		coSignerResponse.TxKey = coSignerCallBack.Key
 		encryptResponse, _ := coSignerConverter.ResponseConverterWithNewCryptoType(coSignerResponse)
-		log.Info("encryptResponse: %s", encryptResponse)
+		log.Info(fmt.Sprintf("encryptResponse: %s", encryptResponse))
 		resp, err := json.Marshal(encryptResponse)
 		log.Info(string(resp), err)
 		if err != nil {
