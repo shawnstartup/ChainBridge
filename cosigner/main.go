@@ -54,26 +54,26 @@ var (
 )
 
 type CustomerContent struct {
-	TxKey                  string  `json:"txKey"`
-	CoinKey                string  `json:"coinKey"`
-	TxAmount               string  `json:"txAmount"`
-	TransactionType        string  `json:"transactionType"`
-	SourceAccountKey       string  `json:"sourceAccountKey"`
-	SourceAccountType      string  `json:"sourceAccountType"`
-	SourceAddress          string  `json:"sourceAddress"`
-	DestinationAccountKey  string  `json:"destinationAccountKey"`
-	DestinationAccountType string  `json:"destinationAccountType"`
-	DestinationAddress     string  `json:"destinationAddress"`
-	VaultTxDirection       string  `json:"vaultTxDirection"`
-	TransactionStatus      string  `json:"transactionStatus"`
-	CreateTime             uint64  `json:"createTime"`
-	CreatedByUserKey       string  `json:"createdByUserKey"`
-	TxFee                  float64 `json:"txFee"`
-	FeeCoinKey             string  `json:"feeCoinKey"`
-	CustomerRefId          string  `json:"customerRefId"`
-	AmlLock                string  `json:"amlLock"`
-	TransactionDirection   string  `json:"transactionDirection"`
-	EstimateFee            string  `json:"estimateFee"`
+	TxKey                  string `json:"txKey"`
+	CoinKey                string `json:"coinKey"`
+	TxAmount               string `json:"txAmount"`
+	TransactionType        string `json:"transactionType"`
+	SourceAccountKey       string `json:"sourceAccountKey"`
+	SourceAccountType      string `json:"sourceAccountType"`
+	SourceAddress          string `json:"sourceAddress"`
+	DestinationAccountKey  string `json:"destinationAccountKey"`
+	DestinationAccountType string `json:"destinationAccountType"`
+	DestinationAddress     string `json:"destinationAddress"`
+	VaultTxDirection       string `json:"vaultTxDirection"`
+	TransactionStatus      string `json:"transactionStatus"`
+	CreateTime             int64  `json:"createTime"`
+	CreatedByUserKey       string `json:"createdByUserKey"`
+	TxFee                  string `json:"txFee"`
+	FeeCoinKey             string `json:"feeCoinKey"`
+	CustomerRefId          string `json:"customerRefId"`
+	AmlLock                string `json:"amlLock"`
+	TransactionDirection   string `json:"transactionDirection"`
+	EstimateFee            string `json:"estimateFee"`
 }
 type CoSignerCallBackBizContent struct {
 	Type            string          `json:"type"`
