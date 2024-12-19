@@ -1,0 +1,5 @@
+{
+  "keystorePath": "./keys",
+  "bizPrivKey": "/path/to/your/privatekey.pem",
+  "apiPubKey" : "/path/to/your/publickey.pem"
+}
