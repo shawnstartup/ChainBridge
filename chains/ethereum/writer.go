@@ -5,6 +5,7 @@ package ethereum
 
 import (
 	"github.com/ChainSafe/ChainBridge/bindings/Bridge"
+	"github.com/ChainSafe/ChainBridge/vault"
 	"github.com/ChainSafe/chainbridge-utils/core"
 	metrics "github.com/ChainSafe/chainbridge-utils/metrics/types"
 	"github.com/ChainSafe/chainbridge-utils/msg"
@@ -18,6 +19,11 @@ var PassedStatus uint8 = 2
 var TransferredStatus uint8 = 3
 var CancelledStatus uint8 = 4
 
+var VaultInactiveStatus uint8 = 0
+var VaultActiveStatus uint8 = 1
+var VaultPassedStatus uint8 = 2
+var VaultExecutedStatus uint8 = 3
+
 type writer struct {
 	cfg            Config
 	conn           Connection
@@ -26,6 +32,7 @@ type writer struct {
 	stop           <-chan int
 	sysErr         chan<- error // Reports fatal error to core
 	metrics        *metrics.ChainMetrics
+	vault          *vault.Vault
 }
 
 // NewWriter creates and returns writer
@@ -37,6 +44,7 @@ func NewWriter(conn Connection, cfg *Config, log log15.Logger, stop <-chan int, 
 		stop:    stop,
 		sysErr:  sysErr,
 		metrics: m,
+		vault:   vault.NewVault(log),
 	}
 }
 

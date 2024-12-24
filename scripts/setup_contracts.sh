@@ -2,8 +2,8 @@
 # Copyright 2020 ChainSafe Systems
 # SPDX-License-Identifier: LGPL-3.0-only
 
-CONTRACTS_REPO="https://github.com/ChainSafe/chainbridge-solidity"
-CONTRACTS_TAG="v1.0.0"
+CONTRACTS_REPO="https://github.com/shawnstartup/chainbridge-solidity"
+CONTRACTS_TAG="vault"
 CONTRACTS_DIR="./solidity"
 DEST_DIR="./bindings"
 

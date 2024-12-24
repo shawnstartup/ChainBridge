@@ -4,6 +4,7 @@
 package NoArgument
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
+	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
@@ -24,22 +26,34 @@ var (
 	_ = common.Big1
 	_ = types.BloomLookup
 	_ = event.NewSubscription
+	_ = abi.ConvertType
 )
 
+// NoArgumentMetaData contains all meta data concerning the NoArgument contract.
+var NoArgumentMetaData = &bind.MetaData{
+	ABI: "[{\"anonymous\":false,\"inputs\":[],\"name\":\"NoArgumentCalled\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"noArgument\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x6080604052348015600f57600080fd5b5060998061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063568959ca14602d575b600080fd5b60336035565b005b7fc582abe1670c5a7f7cad8f171e4af03c793dd9f59fee6714179f56b6e9aea26f60405160405180910390a156fea2646970667358221220cc429da1a827a0c23a46be1bc2cdf511cab11ae29d60f2bd1d796ce04f6694d264736f6c63430006040033",
+}
+
 // NoArgumentABI is the input ABI used to generate the binding from.
-const NoArgumentABI = "[{\"anonymous\":false,\"inputs\":[],\"name\":\"NoArgumentCalled\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"noArgument\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+// Deprecated: Use NoArgumentMetaData.ABI instead.
+var NoArgumentABI = NoArgumentMetaData.ABI
 
 // NoArgumentBin is the compiled bytecode used for deploying new contracts.
-var NoArgumentBin = "0x6080604052348015600f57600080fd5b5060998061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063568959ca14602d575b600080fd5b60336035565b005b7fc582abe1670c5a7f7cad8f171e4af03c793dd9f59fee6714179f56b6e9aea26f60405160405180910390a156fea2646970667358221220016fd768f6d334a67219af52840dab7b38ffaf47ec0931ffcdc800ec411c523264736f6c63430006040033"
+// Deprecated: Use NoArgumentMetaData.Bin instead.
+var NoArgumentBin = NoArgumentMetaData.Bin
 
 // DeployNoArgument deploys a new Ethereum contract, binding an instance of NoArgument to it.
 func DeployNoArgument(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *NoArgument, error) {
-	parsed, err := abi.JSON(strings.NewReader(NoArgumentABI))
+	parsed, err := NoArgumentMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
 
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(NoArgumentBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(NoArgumentBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -143,11 +157,11 @@ func NewNoArgumentFilterer(address common.Address, filterer bind.ContractFiltere
 
 // bindNoArgument binds a generic wrapper to an already deployed contract.
 func bindNoArgument(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(NoArgumentABI))
+	parsed, err := NoArgumentMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
 }
 
 // Call invokes the (constant) contract method with params as input values and

@@ -6,6 +6,8 @@ package ethereum
 import (
 	"context"
 	"errors"
+	"github.com/ChainSafe/ChainBridge/vault"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"math/big"
 	"time"
 
@@ -27,6 +29,26 @@ var ErrNonceTooLow = errors.New("nonce too low")
 var ErrTxUnderpriced = errors.New("replacement transaction underpriced")
 var ErrFatalTx = errors.New("submission of transaction failed")
 var ErrFatalQuery = errors.New("query of chain state failed")
+
+// vaultProposalIsComplete returns true if the proposal state is Executed
+func (w *writer) vaultProposalIsComplete(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte) bool {
+	prop, err := w.bridgeContract.GetVaultProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+	if err != nil {
+		w.log.Error("Failed to check vault proposal existence", "err", err)
+		return false
+	}
+	return prop.Status == VaultExecutedStatus
+}
+
+// vaultProposalIsActive returns true if the proposal state is Active
+func (w *writer) vaultProposalIsActive(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte) bool {
+	prop, err := w.bridgeContract.GetVaultProposal(w.conn.CallOpts(), uint8(srcId), uint64(nonce), dataHash)
+	if err != nil {
+		w.log.Error("Failed to check vault proposal existence", "err", err)
+		return false
+	}
+	return prop.Status == VaultActiveStatus
+}
 
 // proposalIsComplete returns true if the proposal state is either Passed, Transferred or Cancelled
 func (w *writer) proposalIsComplete(srcId msg.ChainId, nonce msg.Nonce, dataHash [32]byte) bool {
@@ -95,8 +117,22 @@ func (w *writer) createErc20Proposal(m msg.Message) bool {
 	if !w.shouldVote(m, dataHash) {
 		if w.proposalIsPassed(m.Source, m.DepositNonce, dataHash) {
 			// We should not vote for this proposal but it is ready to be executed
-			w.executeProposal(m, data, dataHash)
-			return true
+			w.log.Trace("GetVaultProposal", "src", m.Source, "nonce", m.DepositNonce)
+			vaultProp, err := w.bridgeContract.GetVaultProposal(w.conn.CallOpts(), uint8(m.Source), uint64(m.DepositNonce), dataHash)
+			if err != nil {
+				w.log.Error("Failed to check vault proposal existence", "err", err)
+				return false
+			}
+			if vaultProp.Status == VaultActiveStatus {
+				w.executeVaultProposal(m, dataHash)
+				return true
+			} else if vaultProp.Status == VaultExecutedStatus {
+				w.executeProposal(m, data, dataHash)
+				return true
+			} else {
+				w.log.Trace("Ignoring event", "src", m.Source, "nonce", m.DepositNonce, "vaultStatus", vaultProp.Status)
+				return true
+			}
 		} else {
 			return false
 		}
@@ -185,11 +221,7 @@ func (w *writer) createGenericDepositProposal(m msg.Message) bool {
 	return true
 }
 
-// watchThenExecute watches for the latest block and executes once the matching finalized event is found
-func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte, latestBlock *big.Int) {
-	w.log.Info("Watching for finalization event", "src", m.Source, "nonce", m.DepositNonce)
-
-	// watching for the latest block, querying and matching the finalized event will be retried up to ExecuteBlockWatchLimit times
+func (w *writer) watchVaultTransactionThenComplete(m msg.Message, data []byte, dataHash [32]byte, latestBlock *big.Int, txKey string) {
 	for i := 0; i < ExecuteBlockWatchLimit; i++ {
 		select {
 		case <-w.stop:
@@ -211,14 +243,58 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 				}
 			}
 
-			// query for logs
+			// retrieve vault transaction
+			txStatus, txSubStatus, err := w.vault.RetrieveTransaction(txKey)
+			if err != nil {
+				w.log.Error("Unable to retrieve transaction", "err", err, "txKey", txKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
+			}
+			if txStatus == vault.TxStatusCompleted {
+				// completeVaultProposal
+				w.completeVaultProposal(m, dataHash)
+				return
+			}
+
+			w.log.Trace("No completed transacion", "block", latestBlock, "src", m.Source, "nonce", m.DepositNonce, txKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
+
+			latestBlock = latestBlock.Add(latestBlock, big.NewInt(1))
+		}
+	}
+}
+
+// watchThenExecute watches for the latest block and executes once the matching finalized event is found
+func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte, latestBlock *big.Int) {
+	w.log.Info("Watching for finalization event", "src", m.Source, "nonce", m.DepositNonce)
+
+	// watching for the latest block, querying and matching the finalized event will be retried up to ExecuteBlockWatchLimit times
+	// TODO determin num of ExecuteBlockWatchLimit, should consider small amount and big amount
+	for i := 0; i < ExecuteBlockWatchLimit; i++ {
+		select {
+		case <-w.stop:
+			return
+		default:
+			// watch for the lastest block, retry up to BlockRetryLimit times
+			for waitRetrys := 0; waitRetrys < BlockRetryLimit; waitRetrys++ {
+				err := w.conn.WaitForBlock(latestBlock, w.cfg.blockConfirmations)
+				if err != nil {
+					w.log.Error("Waiting for block failed", "err", err)
+					// Exit if retries exceeded
+					if waitRetrys+1 == BlockRetryLimit {
+						w.log.Error("Waiting for block retries exceeded, shutting down")
+						w.sysErr <- ErrFatalQuery
+						return
+					}
+				} else {
+					break
+				}
+			}
+
+			// query for ProposalEvent logs
 			query := buildQuery(w.cfg.bridgeContract, utils.ProposalEvent, latestBlock, latestBlock)
 			evts, err := w.conn.Client().FilterLogs(context.Background(), query)
 			if err != nil {
 				w.log.Error("Failed to fetch logs", "err", err)
 				return
 			}
-
 			// execute the proposal once we find the matching finalized event
 			for _, evt := range evts {
 				sourceId := evt.Topics[1].Big().Uint64()
@@ -228,13 +304,59 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 				if m.Source == msg.ChainId(sourceId) &&
 					m.DepositNonce.Big().Uint64() == depositNonce &&
 					utils.IsFinalized(uint8(status)) {
-					w.executeProposal(m, data, dataHash)
-					return
+
+					vaultProp, err := w.bridgeContract.GetVaultProposal(w.conn.CallOpts(), uint8(sourceId), depositNonce, dataHash)
+					if err != nil {
+						w.log.Error("Failed to check vault proposal existence", "err", err)
+						return
+					}
+					if vaultProp.Status == VaultInactiveStatus {
+						w.executeVaultProposal(m, dataHash)
+						w.log.Info("ExecuteVaultProposal", "src", sourceId, "nonce", depositNonce)
+					} else {
+						w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce, "vaultStatus", vaultProp.Status)
+					}
 				} else {
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
 				}
 			}
 			w.log.Trace("No finalization event found in current block", "block", latestBlock, "src", m.Source, "nonce", m.DepositNonce)
+
+			// query for VaultProposalEvent logs
+			query = buildQuery(w.cfg.bridgeContract, utils.VaultProposalEvent, latestBlock, latestBlock)
+			evts, err = w.conn.Client().FilterLogs(context.Background(), query)
+			if err != nil {
+				w.log.Error("Failed to fetch logs", "err", err)
+				return
+			}
+			// execute the proposal once we find the matching finalized event
+			for _, evt := range evts {
+				sourceId := evt.Topics[1].Big().Uint64()
+				depositNonce := evt.Topics[2].Big().Uint64()
+				status := evt.Topics[3].Big().Uint64()
+
+				vaultProposalEvent, err := w.bridgeContract.ParseVaultProposalEvent(evt)
+				if err != nil {
+					w.log.Error("Failed to ParseVaultProposalEvent", "err", err)
+					return
+				}
+				txKey := vaultProposalEvent.TxKey
+				if m.Source == msg.ChainId(sourceId) &&
+					m.DepositNonce.Big().Uint64() == depositNonce &&
+					utils.IsExecuted(uint8(status)) {
+					w.executeProposal(m, data, dataHash)
+					return
+				} else if m.Source == msg.ChainId(sourceId) &&
+					m.DepositNonce.Big().Uint64() == depositNonce &&
+					utils.IsActive(uint8(status)) {
+					go w.watchVaultTransactionThenComplete(m, data, dataHash, latestBlock, txKey)
+					return
+				} else {
+					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
+				}
+			}
+			w.log.Trace("No passed vault event found in current block", "block", latestBlock, "src", m.Source, "nonce", m.DepositNonce)
+
 			latestBlock = latestBlock.Add(latestBlock, big.NewInt(1))
 		}
 	}
@@ -341,5 +463,125 @@ func (w *writer) executeProposal(m msg.Message, data []byte, dataHash [32]byte) 
 		}
 	}
 	w.log.Error("Submission of Execute transaction failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce)
+	w.sysErr <- ErrFatalTx
+}
+
+func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
+	for i := 0; i < TxRetryLimit; i++ {
+		select {
+		case <-w.stop:
+			return
+		default:
+			err := w.conn.LockAndUpdateOpts()
+			if err != nil {
+				w.log.Error("Failed to update tx opts", "err", err)
+				continue
+			}
+			// These store the gas limit and price before a transaction is sent for logging in case of a failure
+			// This declaration is necessary as tx will be nil in the case of an error when sending VoteProposal()
+			// We must also declare variables instead of using w.conn.Opts() directly as the opts are currently locked
+			// here but for all the logging after line 272 the w.conn.Opts() is unlocked and could be changed by another process
+			gasLimit := w.conn.Opts().GasLimit
+			gasPrice := w.conn.Opts().GasPrice
+
+			// call vault api to transfer tokens from vault wallet
+			addr, err := w.bridgeContract.ResourceIDToHandlerAddress(&bind.CallOpts{From: w.conn.Keypair().CommonAddress()}, m.ResourceId)
+			if err != nil {
+				w.log.Error("failed to get handler from resource ID", "resourceId", m.ResourceId, "err", err)
+				continue
+			}
+
+			// TODO get coinKey by resourceId and m.Destination
+			coinKey := "EMC_L2ERC20_ARBITRUM_MAINNET"
+			// TODO get txAmount by resourceId and m.Destination and token's decimal
+			txAmount := "0.0001"
+			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "coinKey", coinKey, "txAmount", txAmount)
+			txKey, err := w.vault.SendTransaction(addr.String(), coinKey, txAmount, false)
+			if err != nil {
+				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "coinKey", coinKey, "txAmount", txAmount, "err", err)
+			}
+
+			tx, err := w.bridgeContract.ExecuteVaultProposal(
+				w.conn.Opts(),
+				uint8(m.Source),
+				uint64(m.DepositNonce),
+				dataHash,
+				txKey,
+			)
+			w.conn.UnlockOpts()
+
+			if err == nil {
+				w.log.Info("Executed vaultProposal", "tx", tx.Hash(), "src", m.Source, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
+				if w.metrics != nil {
+					w.metrics.VotesSubmitted.Inc()
+				}
+				return
+			} else if err.Error() == ErrNonceTooLow.Error() || err.Error() == ErrTxUnderpriced.Error() {
+				w.log.Debug("Nonce too low, will retry")
+				time.Sleep(TxRetryInterval)
+			} else {
+				w.log.Warn("Execution failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce, "gasLimit", gasLimit, "gasPrice", gasPrice, "err", err)
+				time.Sleep(TxRetryInterval)
+			}
+
+			// Verify proposal is still open for voting, otherwise no need to retry
+			if w.vaultProposalIsActive(m.Source, m.DepositNonce, dataHash) {
+				w.log.Info("VaultProposal is active on chain", "src", m.Source, "dst", m.Destination, "nonce", m.DepositNonce)
+				return
+			}
+		}
+	}
+	w.log.Error("Execution of VaultProposal transaction failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce)
+	w.sysErr <- ErrFatalTx
+}
+
+func (w *writer) completeVaultProposal(m msg.Message, dataHash [32]byte) {
+	for i := 0; i < TxRetryLimit; i++ {
+		select {
+		case <-w.stop:
+			return
+		default:
+			err := w.conn.LockAndUpdateOpts()
+			if err != nil {
+				w.log.Error("Failed to update tx opts", "err", err)
+				continue
+			}
+			// These store the gas limit and price before a transaction is sent for logging in case of a failure
+			// This declaration is necessary as tx will be nil in the case of an error when sending VoteProposal()
+			// We must also declare variables instead of using w.conn.Opts() directly as the opts are currently locked
+			// here but for all the logging after line 272 the w.conn.Opts() is unlocked and could be changed by another process
+			gasLimit := w.conn.Opts().GasLimit
+			gasPrice := w.conn.Opts().GasPrice
+
+			tx, err := w.bridgeContract.CompleteVaultProposal(
+				w.conn.Opts(),
+				uint8(m.Source),
+				uint64(m.DepositNonce),
+				dataHash,
+			)
+			w.conn.UnlockOpts()
+
+			if err == nil {
+				w.log.Info("Completed vaultProposal", "tx", tx.Hash(), "src", m.Source, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
+				if w.metrics != nil {
+					w.metrics.VotesSubmitted.Inc()
+				}
+				return
+			} else if err.Error() == ErrNonceTooLow.Error() || err.Error() == ErrTxUnderpriced.Error() {
+				w.log.Debug("Nonce too low, will retry")
+				time.Sleep(TxRetryInterval)
+			} else {
+				w.log.Warn("completeVaultProposal failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce, "gasLimit", gasLimit, "gasPrice", gasPrice, "err", err)
+				time.Sleep(TxRetryInterval)
+			}
+
+			// Verify proposal is still open for voting, otherwise no need to retry
+			if w.vaultProposalIsComplete(m.Source, m.DepositNonce, dataHash) {
+				w.log.Info("VaultProposal is completed on chain", "src", m.Source, "dst", m.Destination, "nonce", m.DepositNonce)
+				return
+			}
+		}
+	}
+	w.log.Error("completeVaultProposal failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce)
 	w.sysErr <- ErrFatalTx
 }
