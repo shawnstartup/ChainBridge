@@ -17,7 +17,7 @@ import (
 )
 
 // Number of blocks to wait for an finalization event
-const ExecuteBlockWatchLimit = 100
+const ExecuteBlockWatchLimit = 500
 
 // Time between retrying a failed tx
 const TxRetryInterval = time.Second * 2
@@ -335,12 +335,6 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 				depositNonce := evt.Topics[2].Big().Uint64()
 				status := evt.Topics[3].Big().Uint64()
 
-				vaultProposalEvent, err := w.bridgeContract.ParseVaultProposalEvent(evt)
-				if err != nil {
-					w.log.Error("Failed to ParseVaultProposalEvent", "err", err)
-					return
-				}
-				txKey := vaultProposalEvent.TxKey
 				if m.Source == msg.ChainId(sourceId) &&
 					m.DepositNonce.Big().Uint64() == depositNonce &&
 					utils.IsExecuted(uint8(status)) {
@@ -349,8 +343,13 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 				} else if m.Source == msg.ChainId(sourceId) &&
 					m.DepositNonce.Big().Uint64() == depositNonce &&
 					utils.IsActive(uint8(status)) {
-					go w.watchVaultTransactionThenComplete(m, data, dataHash, latestBlock, txKey)
-					return
+					vaultProposalEvent, err := w.bridgeContract.ParseVaultProposalEvent(evt)
+					if err != nil {
+						w.log.Error("Failed to ParseVaultProposalEvent", "err", err)
+						return
+					}
+					txKey := vaultProposalEvent.TxKey
+					go w.watchVaultTransactionThenComplete(m, data, dataHash, big.NewInt(latestBlock.Int64()), txKey)
 				} else {
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
 				}
