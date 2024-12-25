@@ -221,60 +221,24 @@ func (w *writer) createGenericDepositProposal(m msg.Message) bool {
 	return true
 }
 
-func (w *writer) watchVaultTransactionThenComplete(m msg.Message, data []byte, dataHash [32]byte, latestBlock *big.Int, txKey string) {
-	for i := 0; i < ExecuteBlockWatchLimit; i++ {
-		select {
-		case <-w.stop:
-			return
-		default:
-			// watch for the lastest block, retry up to BlockRetryLimit times
-			for waitRetrys := 0; waitRetrys < BlockRetryLimit; waitRetrys++ {
-				err := w.conn.WaitForBlock(latestBlock, w.cfg.blockConfirmations)
-				if err != nil {
-					w.log.Error("Waiting for block failed", "err", err)
-					// Exit if retries exceeded
-					if waitRetrys+1 == BlockRetryLimit {
-						w.log.Error("Waiting for block retries exceeded, shutting down")
-						w.sysErr <- ErrFatalQuery
-						return
-					}
-				} else {
-					break
-				}
-			}
-
-			// retrieve vault transaction
-			txStatus, txSubStatus, err := w.vault.RetrieveTransaction(txKey)
-			if err != nil {
-				w.log.Error("Unable to retrieve transaction", "err", err, "txKey", txKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
-			}
-			if txStatus == vault.TxStatusCompleted {
-				// completeVaultProposal
-				w.completeVaultProposal(m, dataHash)
-				return
-			}
-
-			w.log.Trace("No completed transacion", "block", latestBlock, "src", m.Source, "nonce", m.DepositNonce, txKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
-
-			latestBlock = latestBlock.Add(latestBlock, big.NewInt(1))
-		}
-	}
-}
-
 // watchThenExecute watches for the latest block and executes once the matching finalized event is found
 func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte, latestBlock *big.Int) {
 	w.log.Info("Watching for finalization event", "src", m.Source, "nonce", m.DepositNonce)
+	vaultTxKey := ""
+	vaultTxCompleted := false
 
+	var startBlock = big.NewInt(latestBlock.Int64())
+	var currentBlock = startBlock
 	// watching for the latest block, querying and matching the finalized event will be retried up to ExecuteBlockWatchLimit times
 	// TODO determin num of ExecuteBlockWatchLimit, should consider small amount and big amount
-	for i := 0; i < ExecuteBlockWatchLimit; i++ {
+	for currentBlock.Int64() < startBlock.Int64()+ExecuteBlockWatchLimit {
 		select {
 		case <-w.stop:
 			return
 		default:
 			// watch for the lastest block, retry up to BlockRetryLimit times
 			for waitRetrys := 0; waitRetrys < BlockRetryLimit; waitRetrys++ {
-				err := w.conn.WaitForBlock(latestBlock, w.cfg.blockConfirmations)
+				err := w.conn.WaitForBlock(currentBlock, w.cfg.blockConfirmations)
 				if err != nil {
 					w.log.Error("Waiting for block failed", "err", err)
 					// Exit if retries exceeded
@@ -289,7 +253,8 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 			}
 
 			// query for ProposalEvent logs
-			query := buildQuery(w.cfg.bridgeContract, utils.ProposalEvent, latestBlock, latestBlock)
+			endBlock := new(big.Int).Add(currentBlock, big.NewInt(w.cfg.blockConfirmations.Int64()-1))
+			query := buildQuery(w.cfg.bridgeContract, utils.ProposalEvent, currentBlock, endBlock)
 			evts, err := w.conn.Client().FilterLogs(context.Background(), query)
 			if err != nil {
 				w.log.Error("Failed to fetch logs", "err", err)
@@ -320,15 +285,16 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
 				}
 			}
-			w.log.Trace("No finalization event found in current block", "block", latestBlock, "src", m.Source, "nonce", m.DepositNonce)
+			w.log.Trace("No finalization event found in current block", "block", currentBlock, "src", m.Source, "nonce", m.DepositNonce)
 
 			// query for VaultProposalEvent logs
-			query = buildQuery(w.cfg.bridgeContract, utils.VaultProposalEvent, latestBlock, latestBlock)
+			query = buildQuery(w.cfg.bridgeContract, utils.VaultProposalEvent, currentBlock, endBlock)
 			evts, err = w.conn.Client().FilterLogs(context.Background(), query)
 			if err != nil {
 				w.log.Error("Failed to fetch logs", "err", err)
 				return
 			}
+
 			// execute the proposal once we find the matching finalized event
 			for _, evt := range evts {
 				sourceId := evt.Topics[1].Big().Uint64()
@@ -348,15 +314,28 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 						w.log.Error("Failed to ParseVaultProposalEvent", "err", err)
 						return
 					}
-					txKey := vaultProposalEvent.TxKey
-					go w.watchVaultTransactionThenComplete(m, data, dataHash, big.NewInt(latestBlock.Int64()), txKey)
+					vaultTxKey = vaultProposalEvent.TxKey
 				} else {
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
 				}
 			}
-			w.log.Trace("No passed vault event found in current block", "block", latestBlock, "src", m.Source, "nonce", m.DepositNonce)
+			// retrieve vault transaction
+			if vaultTxKey != "" && !vaultTxCompleted {
+				txStatus, txSubStatus, err := w.vault.RetrieveTransaction(vaultTxKey)
+				if err != nil {
+					w.log.Error("Unable to retrieve vault transaction", "err", err, "txKey", vaultTxKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
+				}
+				if txStatus == vault.TxStatusCompleted {
+					// completeVaultProposal
+					w.completeVaultProposal(m, dataHash)
+					vaultTxCompleted = true
+				}
+			}
 
-			latestBlock = latestBlock.Add(latestBlock, big.NewInt(1))
+			w.log.Trace("No passed vault event found in current block", "block", currentBlock, "src", m.Source, "nonce", m.DepositNonce)
+
+			currentBlock = new(big.Int).Add(currentBlock, w.cfg.blockConfirmations)
+
 		}
 	}
 	log.Warn("Block watch limit exceeded, skipping execution", "source", m.Source, "dest", m.Destination, "nonce", m.DepositNonce)
