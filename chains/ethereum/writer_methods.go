@@ -469,14 +469,16 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 				continue
 			}
 
-			// TODO get coinKey by resourceId and m.Destination
-			coinKey := "EMC_L2ERC20_ARBITRUM_MAINNET"
-			// TODO get txAmount by resourceId and m.Destination and token's decimal
-			txAmount := "0.0001"
-			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "coinKey", coinKey, "txAmount", txAmount)
-			txKey, err := w.vault.SendTransaction(addr.String(), coinKey, txAmount, false)
+			// TODO set below cutomer fields for audit by cosigner callback service
+			//  CustomerExt1           string     `json:"customerExt1,omitempty"`
+			//	CustomerExt2           string     `json:"customerExt2,omitempty"`
+			//	Note                   string     `json:"note,omitempty"`
+
+			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "txAmount", m.Amount)
+			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), m.Amount, false)
 			if err != nil {
-				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "coinKey", coinKey, "txAmount", txAmount, "err", err)
+				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "txAmount", m.Amount, "err", err)
+				return
 			}
 
 			tx, err := w.bridgeContract.ExecuteVaultProposal(
@@ -489,7 +491,7 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 			w.conn.UnlockOpts()
 
 			if err == nil {
-				w.log.Info("Executed vaultProposal", "tx", tx.Hash(), "src", m.Source, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
+				w.log.Info("Executed vaultProposal", "tx", tx.Hash(), "resourceId", m.ResourceId.Hex(), "src", m.Source, "destination", m.Destination, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
 				if w.metrics != nil {
 					w.metrics.VotesSubmitted.Inc()
 				}
