@@ -549,15 +549,17 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 
 			//  make Raw with below cutomer fields for audit by cosigner callback service
 			customerRefId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
-			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "txAmount", m.Amount)
+			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String())
+			amount := big.NewInt(0).SetBytes(m.Payload[0].([]byte))
+			//recipientBytes := m.Payload[1]
 
-			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefId, m.Amount, false)
+			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefId, amount, false)
 			if err != nil {
-				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "txAmount", m.Amount, "err", err)
+				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "amount", amount.String(), "err", err)
 				time.Sleep(TxRetryInterval)
 				return
 			}
-			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "txAmount", m.Amount, "customerRefId", customerRefId, "txKey", txKey)
+			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "customerRefId", customerRefId, "txKey", txKey, "amount", amount.String())
 
 			tx, err := w.bridgeContract.PassVaultProposal(
 				w.conn.Opts(),
