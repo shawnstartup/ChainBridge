@@ -10,18 +10,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	bridgeConfig "github.com/ChainSafe/ChainBridge/config"
 	"github.com/ChainSafe/ChainBridge/cosigner/config"
+	vault "github.com/ChainSafe/ChainBridge/vault"
+	"github.com/ChainSafe/chainbridge-utils/core"
+	"github.com/ChainSafe/chainbridge-utils/msg"
+	log "github.com/ChainSafe/log15"
 	"github.com/Safeheron/safeheron-api-sdk-go/safeheron/cosigner"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/urfave/cli/v2"
 	"io"
 	"net/http"
 	"os"
-	"time"
-
-	log "github.com/ChainSafe/log15"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/urfave/cli/v2"
 	"strconv"
+	"time"
 )
+
+var VaultInactiveStatus uint8 = 0
+var VaultActiveStatus uint8 = 1
+var VaultPassedStatus uint8 = 2
+var VaultExecutedStatus uint8 = 3
 
 var coSignerConverter cosigner.CoSignerConverter
 
@@ -42,6 +50,7 @@ var generateFlags = []cli.Flag{
 }
 
 var devFlags = []cli.Flag{}
+var chains = make(map[uint8]*config.EthereumChain)
 
 //var importFlags = []cli.Flag{
 //	config.Sr25519Flag,
@@ -132,6 +141,44 @@ func run(ctx *cli.Context) error {
 
 	log.Debug("Config on initialization...", "config", *cfg)
 
+	bridgeCfg, err := bridgeConfig.GetConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, chain := range bridgeCfg.Chains {
+		chainId, errr := strconv.Atoi(chain.Id)
+		if errr != nil {
+			return errr
+		}
+		chainConfig := &core.ChainConfig{
+			Name:           chain.Name,
+			Id:             msg.ChainId(chainId),
+			Endpoint:       chain.Endpoint,
+			From:           chain.From,
+			KeystorePath:   cfg.KeystorePath,
+			Insecure:       false,
+			BlockstorePath: ctx.String(bridgeConfig.BlockstorePathFlag.Name),
+			FreshStart:     ctx.Bool(bridgeConfig.FreshStartFlag.Name),
+			LatestBlock:    ctx.Bool(bridgeConfig.LatestBlockFlag.Name),
+			Opts:           chain.Opts,
+		}
+
+		logger := log.Root().New("chain", chainConfig.Name)
+
+		if chain.Type == "ethereum" {
+			newChain, err := config.InitializeEthereumChain(chainConfig, logger)
+			if err != nil {
+				return err
+			}
+			chains[uint8(chainConfig.Id)] = newChain
+		} else if chain.Type == "substrate" {
+			return errors.New("unrecognized Chain Type")
+		} else {
+			return errors.New("unrecognized Chain Type")
+		}
+	}
+
 	coSignerConverter = cosigner.CoSignerConverter{Config: cosigner.CoSignerConfig{
 		ApiPubKey:  cfg.ApiPubKey,
 		BizPrivKey: cfg.BizPrivKey,
@@ -179,11 +226,42 @@ func run(ctx *cli.Context) error {
 			log.Error(fmt.Sprintf("Unmarshal coSignerBizContent err : %s", err.Error()))
 			return
 		}
-		log.Info(fmt.Sprintf("coSignerCallBackBizContent.CustomerContent.TxKey: %s", coSignerCallBackBizContent.CustomerContent.TxKey))
 
 		var coSignerResponse cosigner.CoSignerResponse
-		coSignerResponse.Approve = true
 		coSignerResponse.TxKey = coSignerCallBackBizContent.CustomerContent.TxKey
+		coSignerResponse.Approve = false
+
+		customerRefId := coSignerCallBackBizContent.CustomerContent.CustomerRefId
+		log.Info("CustomerContent", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
+
+		txCustomerRefId, err := vault.ParseCustomerRefId(customerRefId)
+		if err != nil {
+			log.Error(fmt.Sprintf("Unmarshal coSignerBizContent err : %s", err.Error()))
+		} else {
+			chainId := txCustomerRefId.DstChainId
+			chain, ok := chains[chainId]
+			if !ok {
+				log.Error("resource not found")
+			} else {
+				proposalRecord, err := chain.BridgeContract.GetTxProposalRecord(chain.Conn.CallOpts(), txCustomerRefId.Raw)
+				if err != nil {
+					log.Error("proposalRecord not found", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
+				} else {
+					prop, err := chain.BridgeContract.GetVaultProposal(chain.Conn.CallOpts(), proposalRecord.OriginChainID, proposalRecord.DepositNonce, proposalRecord.DataHash)
+					if err != nil {
+						log.Error("Failed to check vault proposal existence", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
+					} else {
+						if prop.Status == VaultInactiveStatus || prop.Status == VaultActiveStatus {
+							log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", "vaultProposalStatus", customerRefId, prop.Status)
+						} else {
+							coSignerResponse.Approve = true
+						}
+					}
+				}
+			}
+		}
+		//chainId = coSignerCallBackBizContent.CustomerContent.
+
 		encryptResponse, _ := coSignerConverter.ResponseConverterWithNewCryptoType(coSignerResponse)
 		log.Debug(fmt.Sprintf("encryptResponse: %s", encryptResponse))
 		resp, err := json.Marshal(encryptResponse)

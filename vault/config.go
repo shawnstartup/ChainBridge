@@ -1,7 +1,8 @@
 package vault
 
 type VaultBridgeConfig struct {
-	BridgeResources map[string]map[uint8]*ResourceChain `mapstructure:"bridgeResources"`
+	CustomerRefIdPrefix string
+	BridgeResources     map[string]map[uint8]*ResourceChain `mapstructure:"bridgeResources"`
 }
 
 type ResourceChain struct {

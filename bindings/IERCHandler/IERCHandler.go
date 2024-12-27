@@ -31,7 +31,7 @@ var (
 
 // IERCHandlerMetaData contains all meta data concerning the IERCHandler contract.
 var IERCHandlerMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"resourceID\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"name\":\"setResource\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"name\":\"setBurnable\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amountOrTokenID\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"resourceID\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"name\":\"setResource\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"}],\"name\":\"setBurnable\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amountOrTokenID\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vaultAddress\",\"type\":\"address\"}],\"name\":\"setVault\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
 // IERCHandlerABI is the input ABI used to generate the binding from.
@@ -220,6 +220,27 @@ func (_IERCHandler *IERCHandlerSession) SetResource(resourceID [32]byte, contrac
 // Solidity: function setResource(bytes32 resourceID, address contractAddress) returns()
 func (_IERCHandler *IERCHandlerTransactorSession) SetResource(resourceID [32]byte, contractAddress common.Address) (*types.Transaction, error) {
 	return _IERCHandler.Contract.SetResource(&_IERCHandler.TransactOpts, resourceID, contractAddress)
+}
+
+// SetVault is a paid mutator transaction binding the contract method 0x6817031b.
+//
+// Solidity: function setVault(address vaultAddress) returns()
+func (_IERCHandler *IERCHandlerTransactor) SetVault(opts *bind.TransactOpts, vaultAddress common.Address) (*types.Transaction, error) {
+	return _IERCHandler.contract.Transact(opts, "setVault", vaultAddress)
+}
+
+// SetVault is a paid mutator transaction binding the contract method 0x6817031b.
+//
+// Solidity: function setVault(address vaultAddress) returns()
+func (_IERCHandler *IERCHandlerSession) SetVault(vaultAddress common.Address) (*types.Transaction, error) {
+	return _IERCHandler.Contract.SetVault(&_IERCHandler.TransactOpts, vaultAddress)
+}
+
+// SetVault is a paid mutator transaction binding the contract method 0x6817031b.
+//
+// Solidity: function setVault(address vaultAddress) returns()
+func (_IERCHandler *IERCHandlerTransactorSession) SetVault(vaultAddress common.Address) (*types.Transaction, error) {
+	return _IERCHandler.Contract.SetVault(&_IERCHandler.TransactOpts, vaultAddress)
 }
 
 // Withdraw is a paid mutator transaction binding the contract method 0xd9caed12.

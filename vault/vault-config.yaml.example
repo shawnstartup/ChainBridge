@@ -12,3 +12,17 @@ accountKey: account****5ecad40
 destinationAddress: 0x9437A****0BF95f5
 # RequestTimeout (Millisecond), Default: 20000
 requestTimeout: 20000
+bridgeResources:
+  0x000000000000000000000000000000c76ebe4a02bbc34786d860b355f5a5cf00:
+    1:
+      chainName: Arbitrum One
+      coinKey: EMC_L2ERC20_ARBITRUM_MAINNET
+      coinName: EMC
+      coinDecimal: 18
+      coinType: ERC20
+    2:
+      chainName: Edge Matrix Chain
+      coinKey: EMC_L1ERC20_WEMC_MAINNET
+      coinName: WEMC
+      coinDecimal: 18
+      coinType: ERC20

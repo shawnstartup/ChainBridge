@@ -10,15 +10,25 @@ import (
 	"github.com/spf13/viper"
 	"math"
 	"math/big"
+	"strconv"
 	"strings"
 )
 
 const TxStatusCompleted = "COMPLETED"
 
 type Vault struct {
-	transactionApi    api.TransactionApi
-	vaultBridgeConfig *VaultBridgeConfig
-	log               log15.Logger
+	transactionApi      api.TransactionApi
+	vaultBridgeConfig   *VaultBridgeConfig
+	log                 log15.Logger
+	CustomerRefIdPrefix string
+}
+
+type TxCustomerRefId struct {
+	Raw                 string
+	CustomerRefIdPrefix string
+	SrcChainId          uint8
+	DstChainId          uint8
+	DepositNonce        uint64
 }
 
 func NewVault(log log15.Logger) *Vault {
@@ -40,19 +50,53 @@ func NewVault(log log15.Logger) *Vault {
 	}
 
 	if err := viper.UnmarshalKey("bridgeResources", &vaultBridgeConfig.BridgeResources); err != nil {
-		log.Error("Unable to decode into struct", "err", err)
+		log.Error("Unable to decode into struct BridgeResources", "err", err)
+	}
+
+	if err := viper.UnmarshalKey("customerRefIdPrefix", &vaultBridgeConfig.CustomerRefIdPrefix); err != nil {
+		log.Error("Unable to decode into customerRefIdPrefix string", "err", err)
 	}
 
 	return &Vault{
-		log:               log,
-		transactionApi:    api.TransactionApi{Client: sc},
-		vaultBridgeConfig: &vaultBridgeConfig,
+		log:                 log,
+		transactionApi:      api.TransactionApi{Client: sc},
+		vaultBridgeConfig:   &vaultBridgeConfig,
+		CustomerRefIdPrefix: vaultBridgeConfig.CustomerRefIdPrefix,
 	}
 }
 
-func (v *Vault) RetrieveTransaction(txKey string) (string, string, error) {
+// customerRefId := fmt.Sprintf("%s_src_%03d_dst_%03d_nonce_%09d", w.vault.CustomerRefIdPrefix, m.Source, m.Destination, m.DepositNonce)
+func (v *Vault) MakeCustomerRefId(srcChainId uint8, dstChainId uint8, depositNonce uint64) string {
+	return fmt.Sprintf("%s-src-%03d-dst-%03d-nonce-%09d", v.CustomerRefIdPrefix, srcChainId, dstChainId, depositNonce)
+}
+
+func ParseCustomerRefId(customerRefId string) (*TxCustomerRefId, error) {
+	customerRefIdParams := strings.Split(customerRefId, "-")
+	srcChainId, err := strconv.ParseUint(customerRefIdParams[2], 10, 8)
+	if err != nil {
+		return nil, errors.New("error parsing customerRefId")
+	}
+	dstChainId, err := strconv.ParseUint(customerRefIdParams[4], 10, 8)
+	if err != nil {
+		return nil, errors.New("error parsing customerRefId")
+	}
+	nonce, err := strconv.ParseUint(customerRefIdParams[6], 10, 8)
+	if err != nil {
+		return nil, errors.New("error parsing customerRefId")
+	}
+
+	return &TxCustomerRefId{
+		Raw:                 customerRefId,
+		CustomerRefIdPrefix: customerRefIdParams[0],
+		SrcChainId:          uint8(srcChainId),
+		DstChainId:          uint8(dstChainId),
+		DepositNonce:        nonce,
+	}, nil
+}
+
+func (v *Vault) RetrieveTransaction(txId string) (string, string, error) {
 	oneTransactionsRequest := api.OneTransactionsRequest{
-		TxKey: txKey,
+		CustomerRefId: txId,
 	}
 
 	var txResp api.OneTransactionsResponse
@@ -107,7 +151,7 @@ func WeiToEther(wei *big.Int, decimal int) *big.Float {
 	return ethValue
 }
 
-func (v *Vault) SendVaultTransaction(chainId uint8, resourceId string, destinationAddress string, txAmount *big.Int, failOnContract bool) (string, error) {
+func (v *Vault) SendVaultTransaction(chainId uint8, resourceId string, destinationAddress string, customerRefId string, txAmount *big.Int, failOnContract bool) (string, error) {
 	var decimal int
 	coinKey := ""
 	resourceChain, ok := v.vaultBridgeConfig.BridgeResources[resourceId][chainId]
@@ -135,7 +179,7 @@ func (v *Vault) SendVaultTransaction(chainId uint8, resourceId string, destinati
 		CoinKey:                coinKey,
 		TxAmount:               txAmountString,
 		TxFeeLevel:             "MIDDLE",
-		CustomerRefId:          uuid.New().String(),
+		CustomerRefId:          customerRefId,
 		FailOnContract:         &failOnContract,
 	}
 
