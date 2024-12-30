@@ -25,6 +25,7 @@ type Vault struct {
 
 type TxCustomerRefId struct {
 	Raw                 string
+	TxId                string
 	CustomerRefIdPrefix string
 	SrcChainId          uint8
 	DstChainId          uint8
@@ -65,7 +66,6 @@ func NewVault(log log15.Logger) *Vault {
 	}
 }
 
-// customerRefId := fmt.Sprintf("%s_src_%03d_dst_%03d_nonce_%09d", w.vault.CustomerRefIdPrefix, m.Source, m.Destination, m.DepositNonce)
 func (v *Vault) MakeCustomerRefId(srcChainId uint8, dstChainId uint8, depositNonce uint64) string {
 	return fmt.Sprintf("%s-src-%03d-dst-%03d-nonce-%09d", v.CustomerRefIdPrefix, srcChainId, dstChainId, depositNonce)
 }
@@ -87,6 +87,7 @@ func ParseCustomerRefId(customerRefId string) (*TxCustomerRefId, error) {
 
 	return &TxCustomerRefId{
 		Raw:                 customerRefId,
+		TxId:                fmt.Sprintf("%s-src-%03d-dst-%03d-nonce-%09d", customerRefIdParams[0], srcChainId, dstChainId, nonce),
 		CustomerRefIdPrefix: customerRefIdParams[0],
 		SrcChainId:          uint8(srcChainId),
 		DstChainId:          uint8(dstChainId),

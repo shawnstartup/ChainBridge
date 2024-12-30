@@ -6,6 +6,7 @@ package ethereum
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/ChainSafe/ChainBridge/vault"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"math/big"
@@ -553,13 +554,14 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 			amount := big.NewInt(0).SetBytes(m.Payload[0].([]byte))
 			//recipientBytes := m.Payload[1]
 
-			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefId, amount, false)
+			customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", customerRefId, time.Now().Unix())
+			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefIdWithTimestamp, amount, false)
 			if err != nil {
 				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "amount", amount.String(), "err", err)
 				time.Sleep(TxRetryInterval)
 				return
 			}
-			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "customerRefId", customerRefId, "txKey", txKey, "amount", amount.String())
+			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "customerRefId", customerRefIdWithTimestamp, "txKey", txKey, "amount", amount.String())
 
 			tx, err := w.bridgeContract.PassVaultProposal(
 				w.conn.Opts(),

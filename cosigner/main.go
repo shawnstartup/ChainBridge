@@ -243,7 +243,7 @@ func run(ctx *cli.Context) error {
 			if !ok {
 				log.Error("resource not found")
 			} else {
-				proposalRecord, err := chain.BridgeContract.GetTxProposalRecord(chain.Conn.CallOpts(), txCustomerRefId.Raw)
+				proposalRecord, err := chain.BridgeContract.GetTxProposalRecord(chain.Conn.CallOpts(), txCustomerRefId.TxId)
 				if err != nil {
 					log.Error("proposalRecord not found", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
 				} else {
@@ -255,6 +255,7 @@ func run(ctx *cli.Context) error {
 							log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", "vaultProposalStatus", customerRefId, prop.Status)
 						} else {
 							coSignerResponse.Approve = true
+							log.Info("/audit", "Approve", coSignerResponse.Approve, "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
 						}
 					}
 				}
