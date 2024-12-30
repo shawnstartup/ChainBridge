@@ -243,7 +243,7 @@ func (w *writer) createGenericDepositProposal(m msg.Message) bool {
 // watchThenExecute watches for the latest block and executes once the matching finalized event is found
 func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte, latestBlock *big.Int) {
 	w.log.Info("Watching for finalization event", "src", m.Source, "nonce", m.DepositNonce)
-	vaultTxId := ""
+	vaultTxKey := ""
 	vaultTxCompleted := false
 
 	var startBlock = big.NewInt(latestBlock.Int64())
@@ -337,16 +337,16 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 						w.log.Error("Failed to ParseVaultProposalEvent", "err", err)
 						return
 					}
-					vaultTxId = vaultProposalEvent.TxId
+					vaultTxKey = vaultProposalEvent.TxKey
 				} else {
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
 				}
 			}
 			// retrieve vault transaction
-			if vaultTxId != "" && !vaultTxCompleted {
-				txStatus, txSubStatus, err := w.vault.RetrieveTransaction(vaultTxId)
+			if vaultTxKey != "" && !vaultTxCompleted {
+				txStatus, txSubStatus, err := w.vault.RetrieveTransaction(vaultTxKey, "")
 				if err != nil {
-					w.log.Error("Unable to retrieve vault transaction", "err", err, "txKey", vaultTxId, "txStatus", txStatus, "txSubStatus", txSubStatus)
+					w.log.Error("Unable to retrieve vault transaction", "err", err, "txKey", vaultTxKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
 				}
 				if txStatus == vault.TxStatusCompleted {
 					// completeVaultProposal
@@ -487,12 +487,14 @@ func (w *writer) createVaultProposal(m msg.Message, dataHash [32]byte) {
 
 			//  make Raw with below cutomer fields for audit by cosigner callback service
 			customerRefId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
+			txIdHash := utils.Hash(append([]byte(customerRefId)))
+
 			tx, err := w.bridgeContract.CreateVaultProposal(
 				w.conn.Opts(),
 				uint8(m.Source),
 				uint64(m.DepositNonce),
 				dataHash,
-				customerRefId,
+				txIdHash,
 			)
 			w.conn.UnlockOpts()
 
@@ -568,6 +570,7 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 				uint8(m.Source),
 				uint64(m.DepositNonce),
 				dataHash,
+				txKey,
 			)
 			w.conn.UnlockOpts()
 

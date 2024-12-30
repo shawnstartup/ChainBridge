@@ -95,9 +95,10 @@ func ParseCustomerRefId(customerRefId string) (*TxCustomerRefId, error) {
 	}, nil
 }
 
-func (v *Vault) RetrieveTransaction(txId string) (string, string, error) {
+func (v *Vault) RetrieveTransaction(txKey string, txId string) (string, string, error) {
 	oneTransactionsRequest := api.OneTransactionsRequest{
 		CustomerRefId: txId,
+		TxKey:         txKey,
 	}
 
 	var txResp api.OneTransactionsResponse

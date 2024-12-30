@@ -12,6 +12,7 @@ import (
 	"fmt"
 	bridgeConfig "github.com/ChainSafe/ChainBridge/config"
 	"github.com/ChainSafe/ChainBridge/cosigner/config"
+	utils "github.com/ChainSafe/ChainBridge/shared/ethereum"
 	vault "github.com/ChainSafe/ChainBridge/vault"
 	"github.com/ChainSafe/chainbridge-utils/core"
 	"github.com/ChainSafe/chainbridge-utils/msg"
@@ -243,19 +244,20 @@ func run(ctx *cli.Context) error {
 			if !ok {
 				log.Error("resource not found")
 			} else {
-				proposalRecord, err := chain.BridgeContract.GetTxProposalRecord(chain.Conn.CallOpts(), txCustomerRefId.TxId)
+				txIdHash := utils.Hash(append([]byte(customerRefId)))
+				proposalRecord, err := chain.BridgeContract.GetTxProposalRecord(chain.Conn.CallOpts(), txIdHash)
 				if err != nil {
-					log.Error("proposalRecord not found", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId)
+					log.Error("proposalRecord not found", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", txIdHash)
 				} else {
 					prop, err := chain.BridgeContract.GetVaultProposal(chain.Conn.CallOpts(), proposalRecord.OriginChainID, proposalRecord.DepositNonce, proposalRecord.DataHash)
 					if err != nil {
-						log.Error("Failed to check vault proposal existence", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
+						log.Error("Failed to check vault proposal existence", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", txIdHash)
 					} else {
 						if prop.Status != VaultPassedStatus {
-							log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "vaultProposalStatus", prop.Status)
+							log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", txIdHash, "vaultProposalStatus", prop.Status)
 						} else {
 							coSignerResponse.Approve = true
-							log.Info("/audit", "Approve", coSignerResponse.Approve, "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
+							log.Info("/audit", "Approve", coSignerResponse.Approve, "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", txIdHash)
 						}
 					}
 				}
