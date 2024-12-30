@@ -5,6 +5,7 @@ package ethereum
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/ChainSafe/ChainBridge/vault"
@@ -486,8 +487,8 @@ func (w *writer) createVaultProposal(m msg.Message, dataHash [32]byte) {
 			gasPrice := w.conn.Opts().GasPrice
 
 			//  make Raw with below cutomer fields for audit by cosigner callback service
-			customerRefId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
-			txIdHash := utils.Hash(append([]byte(customerRefId)))
+			txId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
+			txIdHash := utils.Hash(append([]byte(txId)))
 
 			tx, err := w.bridgeContract.CreateVaultProposal(
 				w.conn.Opts(),
@@ -499,7 +500,7 @@ func (w *writer) createVaultProposal(m msg.Message, dataHash [32]byte) {
 			w.conn.UnlockOpts()
 
 			if err == nil {
-				w.log.Info("Create vaultProposal", "tx", tx.Hash(), "customerRefId", customerRefId, "resourceId", m.ResourceId.Hex(), "src", m.Source, "destination", m.Destination, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
+				w.log.Info("Create vaultProposal", "tx", tx.Hash(), "txId", txId, "txIdHash", hex.EncodeToString(txIdHash[:]), "resourceId", m.ResourceId.Hex(), "src", m.Source, "destination", m.Destination, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
 				if w.metrics != nil {
 					w.metrics.VotesSubmitted.Inc()
 				}
@@ -551,12 +552,12 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 			}
 
 			//  make Raw with below cutomer fields for audit by cosigner callback service
-			customerRefId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
+			txId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
 			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String())
 			amount := big.NewInt(0).SetBytes(m.Payload[0].([]byte))
 			//recipientBytes := m.Payload[1]
 
-			customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", customerRefId, time.Now().Unix())
+			customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, time.Now().Unix())
 			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefIdWithTimestamp, amount, false)
 			if err != nil {
 				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "amount", amount.String(), "err", err)
