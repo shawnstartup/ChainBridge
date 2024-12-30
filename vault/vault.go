@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/ChainSafe/log15"
@@ -153,6 +154,10 @@ func WeiToEther(wei *big.Int, decimal int) *big.Float {
 	return ethValue
 }
 
+type TransactionNote struct {
+	CustomerRefId string
+}
+
 func (v *Vault) SendVaultTransaction(chainId uint8, resourceId string, destinationAddress string, customerRefId string, txAmount *big.Int, failOnContract bool) (string, error) {
 	var decimal int
 	coinKey := ""
@@ -171,6 +176,11 @@ func (v *Vault) SendVaultTransaction(chainId uint8, resourceId string, destinati
 	if txAmountString == "" {
 		return "", errors.New("transaction amount is zero")
 	}
+
+	txNote := TransactionNote{
+		CustomerRefId: customerRefId,
+	}
+	txNoteJson, _ := json.Marshal(txNote)
 	v.log.Info("SendVaultTransaction", "destinationChainId", chainId, "destinationAddress", destinationAddress, "txAmount", txAmountString)
 
 	createTransactionsRequest := api.CreateTransactionsRequest{
@@ -183,6 +193,7 @@ func (v *Vault) SendVaultTransaction(chainId uint8, resourceId string, destinati
 		TxFeeLevel:             "MIDDLE",
 		CustomerRefId:          customerRefId,
 		FailOnContract:         &failOnContract,
+		Note:                   string(txNoteJson),
 	}
 
 	var txKeyResult api.TxKeyResult
