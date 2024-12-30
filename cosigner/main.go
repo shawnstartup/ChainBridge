@@ -251,7 +251,7 @@ func run(ctx *cli.Context) error {
 					if err != nil {
 						log.Error("Failed to check vault proposal existence", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId)
 					} else {
-						if prop.Status == VaultInactiveStatus || prop.Status == VaultActiveStatus {
+						if prop.Status != VaultPassedStatus {
 							log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", "vaultProposalStatus", customerRefId, prop.Status)
 						} else {
 							coSignerResponse.Approve = true
