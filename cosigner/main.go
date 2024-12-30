@@ -250,16 +250,20 @@ func run(ctx *cli.Context) error {
 				if err != nil {
 					log.Error("proposalRecord not found", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]))
 				} else {
-					log.Info("GetVaultProposal", "originChainID", proposalRecord.OriginChainID, "depositNonce", proposalRecord.DepositNonce, "dataHash", proposalRecord.DataHash)
-					prop, err := chain.BridgeContract.GetVaultProposal(chain.Conn.CallOpts(), proposalRecord.OriginChainID, proposalRecord.DepositNonce, proposalRecord.DataHash)
-					if err != nil {
-						log.Error("Failed to check vault proposal existence", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]))
+					if len(proposalRecord.DataHash) < 1 {
+						log.Error("proposalRecord.DataHash is empty", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]), "originChainID", proposalRecord.OriginChainID, "depositNonce", proposalRecord.DepositNonce)
 					} else {
-						if prop.Status != VaultPassedStatus {
-							log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]), "vaultProposalStatus", prop.Status)
+						log.Info("GetVaultProposal", "originChainID", proposalRecord.OriginChainID, "depositNonce", proposalRecord.DepositNonce, "dataHash", hex.EncodeToString(proposalRecord.DataHash[:]))
+						prop, err := chain.BridgeContract.GetVaultProposal(chain.Conn.CallOpts(), proposalRecord.OriginChainID, proposalRecord.DepositNonce, proposalRecord.DataHash)
+						if err != nil {
+							log.Error("Failed to check vault proposal existence", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]))
 						} else {
-							coSignerResponse.Approve = true
-							log.Info("/audit", "Approve", coSignerResponse.Approve, "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]))
+							if prop.Status != VaultPassedStatus {
+								log.Error("Failed to check vaultProposalStatus", "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]), "vaultProposalStatus", prop.Status)
+							} else {
+								coSignerResponse.Approve = true
+								log.Info("/audit", "Approve", coSignerResponse.Approve, "TxKey", coSignerCallBackBizContent.CustomerContent.TxKey, "customerRefId", customerRefId, "txId", txCustomerRefId.TxId, "txIdHash", hex.EncodeToString(txIdHash[:]))
+							}
 						}
 					}
 				}
@@ -275,7 +279,7 @@ func run(ctx *cli.Context) error {
 			log.Error(fmt.Sprintf("Marshal encryptResponse err : %s", err.Error()))
 			return
 		}
-		log.Info(string(resp))
+		log.Debug(string(resp))
 		w.Write(resp)
 	})
 
