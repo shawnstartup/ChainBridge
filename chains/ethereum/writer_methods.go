@@ -296,7 +296,7 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 					}
 					if vaultProp.Status == VaultInactiveStatus {
 						w.createVaultProposal(m, dataHash)
-						w.log.Info("ExecuteVaultProposal", "src", sourceId, "nonce", depositNonce)
+						w.log.Info("createVaultProposal", "src", sourceId, "nonce", depositNonce)
 					} else {
 						w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce, "vaultStatus", vaultProp.Status)
 					}
@@ -497,7 +497,7 @@ func (w *writer) createVaultProposal(m msg.Message, dataHash [32]byte) {
 			w.conn.UnlockOpts()
 
 			if err == nil {
-				w.log.Info("Create vaultProposal", "tx", tx.Hash(), "resourceId", m.ResourceId.Hex(), "src", m.Source, "destination", m.Destination, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
+				w.log.Info("Create vaultProposal", "tx", tx.Hash(), "customerRefId", customerRefId, "resourceId", m.ResourceId.Hex(), "src", m.Source, "destination", m.Destination, "depositNonce", m.DepositNonce, "gasPrice", tx.GasPrice().String())
 				if w.metrics != nil {
 					w.metrics.VotesSubmitted.Inc()
 				}

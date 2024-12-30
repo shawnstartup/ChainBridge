@@ -11,12 +11,12 @@ func TestCustomerRefId(t *testing.T) {
 	}
 	customerRefId := vault.MakeCustomerRefId(1, 3, 133)
 
-	txCustomerRefId, err := ParseCustomerRefId(customerRefId + "-timestamp-12312312312")
+	txCustomerRefId, err := ParseCustomerRefId(customerRefId + "-timestamp-1735534442")
 	if err != nil {
 		t.Fatal(err)
 	}
 	expected := TxCustomerRefId{
-		Raw:                 "bridge_v100-src-001-dst-003-nonce-000000133-timestamp-12312312312",
+		Raw:                 "bridge_v100-src-001-dst-003-nonce-000000133-timestamp-1735534442",
 		TxId:                "bridge_v100-src-001-dst-003-nonce-000000133",
 		CustomerRefIdPrefix: "bridge_v100",
 		SrcChainId:          1,
