@@ -30,6 +30,12 @@ var (
 		Usage: "Path to keystore directory",
 		Value: DefaultKeystorePath,
 	}
+
+	Port = &cli.IntFlag{
+		Name:  "port",
+		Usage: "Port to serve callback on",
+		Value: 60001,
+	}
 )
 
 // Metrics flags

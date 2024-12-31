@@ -41,7 +41,7 @@ lint-fix:
 build:
 	@echo "  >  \033[32mBuilding binary...\033[0m "
 	cd cmd/chainbridge && go build -o ../../build/chainbridge $(VERSION)
-	cd cosigner && go build -o ../build/cosigner-callback $(VERSION)
+	cd cosigner && go build -o ../build/chainbridge-cosigner-callback $(VERSION)
 
 install:
 	@echo "  >  \033[32mInstalling bridge...\033[0m "

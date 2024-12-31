@@ -15,7 +15,9 @@ import (
 	"github.com/ChainSafe/ChainBridge/cosigner/config"
 	utils "github.com/ChainSafe/ChainBridge/shared/ethereum"
 	vault "github.com/ChainSafe/ChainBridge/vault"
+	secretes "github.com/ChainSafe/ChainBridge/vault/secretes"
 	"github.com/ChainSafe/chainbridge-utils/core"
+	"github.com/ChainSafe/chainbridge-utils/keystore"
 	"github.com/ChainSafe/chainbridge-utils/msg"
 	log "github.com/ChainSafe/log15"
 	"github.com/Safeheron/safeheron-api-sdk-go/safeheron/cosigner"
@@ -33,13 +35,14 @@ var VaultActiveStatus uint8 = 1
 var VaultPassedStatus uint8 = 2
 var VaultExecutedStatus uint8 = 3
 
-var coSignerConverter cosigner.CoSignerConverter
+var coSignerConverter CoSignerConverter
 
 var app = cli.NewApp()
 
 var cliFlags = []cli.Flag{
 	config.ConfigFileFlag,
 	config.KeystorePathFlag,
+	config.Port,
 	config.MetricsFlag,
 	config.MetricsPort,
 	config.VerbosityFlag,
@@ -94,10 +97,10 @@ type CoSignerCallBackBizContent struct {
 // init initializes CLI
 func init() {
 	app.Action = run
-	app.Copyright = "Copyright 2019 ChainSafe Systems Authors"
+	app.Copyright = "Copyright 2025 EdgeMatrixChain Lab Authors"
 	app.Name = "chainbridge-cosigner-callback"
-	app.Usage = "ChainBridge"
-	app.Authors = []*cli.Author{{Name: "ChainSafe Systems 2019"}}
+	app.Usage = "Used to handle safe deposit transaction callbacks"
+	app.Authors = []*cli.Author{{Name: "EdgeMatrixChain Lab 2025"}}
 	app.Version = Version
 	app.EnableBashCompletion = true
 	app.Commands = []*cli.Command{}
@@ -181,9 +184,15 @@ func run(ctx *cli.Context) error {
 		}
 	}
 
-	coSignerConverter = cosigner.CoSignerConverter{Config: cosigner.CoSignerConfig{
-		ApiPubKey:  cfg.ApiPubKey,
-		BizPrivKey: cfg.BizPrivKey,
+	pswd := keystore.GetPassword(fmt.Sprintf("Enter password for key %s:", cfg.BizPrivKey))
+	password := string(pswd)
+	bizPrivateKey, err := secretes.LoadEncrypedPrivateKeyFromPath(cfg.BizPrivKey, password)
+	if err != nil {
+		return err
+	}
+
+	coSignerConverter = CoSignerConverter{Config: CoSignerConfig{
+		ApiPubKey: cfg.ApiPubKey,
 	}}
 
 	//var ks = cfg.KeystorePath
@@ -210,14 +219,14 @@ func run(ctx *cli.Context) error {
 			return
 		}
 
-		var coSignerCallBack cosigner.CoSignerCallBack
+		var coSignerCallBack CoSignerCallBack
 
 		if err := json.Unmarshal(body, &coSignerCallBack); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
 
-		coSignerBizContent, _ := coSignerConverter.RequestConvert(coSignerCallBack)
+		coSignerBizContent, _ := coSignerConverter.RequestConvert(coSignerCallBack, bizPrivateKey)
 		//According to different types of CoSignerCallBack, the customer handles the corresponding type of business logic.
 		log.Debug(fmt.Sprintf("coSignerBizContent: %s", coSignerBizContent))
 
@@ -271,7 +280,7 @@ func run(ctx *cli.Context) error {
 		}
 		//chainId = coSignerCallBackBizContent.CustomerContent.
 
-		encryptResponse, _ := coSignerConverter.ResponseConverterWithNewCryptoType(coSignerResponse)
+		encryptResponse, _ := coSignerConverter.ResponseConverterWithNewCryptoType(coSignerResponse, bizPrivateKey)
 		log.Debug(fmt.Sprintf("encryptResponse: %s", encryptResponse))
 		resp, err := json.Marshal(encryptResponse)
 		if err != nil {
@@ -283,7 +292,9 @@ func run(ctx *cli.Context) error {
 		w.Write(resp)
 	})
 
-	err = http.ListenAndServe(fmt.Sprintf(":%d", 60001), nil)
+	port := ctx.Int(config.Port.Name)
+	log.Info("Starting ChainBridge CoSigner Callback server ", "listen", fmt.Sprintf(":%d", port))
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	if errors.Is(err, http.ErrServerClosed) {
 		log.Info("Health status server is shutting down", err)
 	} else {
