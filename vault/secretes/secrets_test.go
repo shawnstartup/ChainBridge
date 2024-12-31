@@ -8,17 +8,17 @@ import (
 )
 
 func TestEncryptPem(t *testing.T) {
-	data, err := os.ReadFile("api_private.pem")
+	data, err := os.ReadFile("/Users/dev/Documents/safeheron/test/api_private.pem")
 	if err != nil {
 		panic(err)
 	}
-	password := "your-password"
+	password := "123321"
 	encryptedBlock, err := encryptPEMBlock(data, password)
 	if err != nil {
 		panic(err)
 	}
 	pemData := pem.EncodeToMemory(encryptedBlock)
-	if err := os.WriteFile("biz_private_encrypted.pem", pemData, 0644); err != nil {
+	if err := os.WriteFile("/Users/dev/Documents/safeheron/test/api_private_encrypted.pem", pemData, 0644); err != nil {
 		panic(err)
 	}
 	fmt.Println("PEM file encrypted successfully.")

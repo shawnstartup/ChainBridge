@@ -1,4 +1,4 @@
-package secretes
+package utils
 
 import (
 	"crypto"

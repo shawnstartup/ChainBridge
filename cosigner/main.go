@@ -13,6 +13,7 @@ import (
 	"fmt"
 	bridgeConfig "github.com/ChainSafe/ChainBridge/config"
 	"github.com/ChainSafe/ChainBridge/cosigner/config"
+	cosigner "github.com/ChainSafe/ChainBridge/safeheron/cosigner"
 	utils "github.com/ChainSafe/ChainBridge/shared/ethereum"
 	vault "github.com/ChainSafe/ChainBridge/vault"
 	secretes "github.com/ChainSafe/ChainBridge/vault/secretes"
@@ -20,7 +21,6 @@ import (
 	"github.com/ChainSafe/chainbridge-utils/keystore"
 	"github.com/ChainSafe/chainbridge-utils/msg"
 	log "github.com/ChainSafe/log15"
-	"github.com/Safeheron/safeheron-api-sdk-go/safeheron/cosigner"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
 	"io"
@@ -35,7 +35,7 @@ var VaultActiveStatus uint8 = 1
 var VaultPassedStatus uint8 = 2
 var VaultExecutedStatus uint8 = 3
 
-var coSignerConverter CoSignerConverter
+var coSignerConverter cosigner.CoSignerConverter
 
 var app = cli.NewApp()
 
@@ -191,7 +191,7 @@ func run(ctx *cli.Context) error {
 		return err
 	}
 
-	coSignerConverter = CoSignerConverter{Config: CoSignerConfig{
+	coSignerConverter = cosigner.CoSignerConverter{Config: cosigner.CoSignerConfig{
 		ApiPubKey: cfg.ApiPubKey,
 	}}
 
@@ -219,7 +219,7 @@ func run(ctx *cli.Context) error {
 			return
 		}
 
-		var coSignerCallBack CoSignerCallBack
+		var coSignerCallBack cosigner.CoSignerCallBack
 
 		if err := json.Unmarshal(body, &coSignerCallBack); err != nil {
 			http.Error(w, err.Error(), 400)

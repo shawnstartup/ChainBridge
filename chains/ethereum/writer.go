@@ -36,7 +36,7 @@ type writer struct {
 }
 
 // NewWriter creates and returns writer
-func NewWriter(conn Connection, cfg *Config, log log15.Logger, stop <-chan int, sysErr chan<- error, m *metrics.ChainMetrics) *writer {
+func NewWriter(conn Connection, cfg *Config, log log15.Logger, stop <-chan int, sysErr chan<- error, m *metrics.ChainMetrics, vault *vault.Vault) *writer {
 	return &writer{
 		cfg:     *cfg,
 		conn:    conn,
@@ -44,7 +44,7 @@ func NewWriter(conn Connection, cfg *Config, log log15.Logger, stop <-chan int, 
 		stop:    stop,
 		sysErr:  sysErr,
 		metrics: m,
-		vault:   vault.NewVault(log),
+		vault:   vault,
 	}
 }
 

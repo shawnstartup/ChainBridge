@@ -10,6 +10,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/ChainSafe/ChainBridge/vault"
 	"net/http"
 	"os"
 
@@ -169,6 +170,7 @@ func run(ctx *cli.Context) error {
 	sysErr := make(chan error)
 	c := core.NewCore(sysErr)
 
+	vault := vault.NewVault(log.Root().New("vault", "safeheron"))
 	for _, chain := range cfg.Chains {
 		chainId, errr := strconv.Atoi(chain.Id)
 		if errr != nil {
@@ -196,7 +198,7 @@ func run(ctx *cli.Context) error {
 		}
 
 		if chain.Type == "ethereum" {
-			newChain, err = ethereum.InitializeChain(chainConfig, logger, sysErr, m)
+			newChain, err = ethereum.InitializeChain(chainConfig, logger, sysErr, m, vault)
 		} else if chain.Type == "substrate" {
 			newChain, err = substrate.InitializeChain(chainConfig, logger, sysErr, m)
 		} else {

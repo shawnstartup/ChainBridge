@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ChainSafe/ChainBridge/safeheron"
+	"github.com/ChainSafe/ChainBridge/safeheron/api"
+	"github.com/ChainSafe/ChainBridge/vault/secretes"
+	"github.com/ChainSafe/chainbridge-utils/keystore"
 	"github.com/ChainSafe/log15"
-	"github.com/Safeheron/safeheron-api-sdk-go/safeheron"
-	"github.com/Safeheron/safeheron-api-sdk-go/safeheron/api"
-	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"math"
 	"math/big"
@@ -39,13 +40,22 @@ func NewVault(log log15.Logger) *Vault {
 		panic(fmt.Errorf("error reading vault config file, %w", err))
 	}
 
-	sc := safeheron.Client{Config: safeheron.ApiConfig{
-		BaseUrl:               viper.GetString("baseUrl"),
-		ApiKey:                viper.GetString("apiKey"),
-		RsaPrivateKey:         viper.GetString("privateKeyPemFile"),
-		SafeheronRsaPublicKey: viper.GetString("safeheronPublicKeyPemFile"),
-		RequestTimeout:        viper.GetInt64("requestTimeout"),
-	}}
+	pswd := keystore.GetPassword(fmt.Sprintf("Enter password for key %s:", viper.GetString("privateKeyPemFile")))
+	password := string(pswd)
+	apiPrivateKey, err := secretes.LoadEncrypedPrivateKeyFromPath(viper.GetString("privateKeyPemFile"), password)
+	if err != nil {
+		panic(fmt.Errorf("error reading encrpted privateKey pem file, %w", err))
+	}
+
+	sc := safeheron.Client{
+		Config: safeheron.ApiConfig{
+			BaseUrl:               viper.GetString("baseUrl"),
+			ApiKey:                viper.GetString("apiKey"),
+			RsaPrivateKey:         viper.GetString("privateKeyPemFile"),
+			SafeheronRsaPublicKey: viper.GetString("safeheronPublicKeyPemFile"),
+			RequestTimeout:        viper.GetInt64("requestTimeout"),
+		},
+		ApiPrivateKey: apiPrivateKey}
 
 	vaultBridgeConfig := VaultBridgeConfig{
 		BridgeResources: make(map[string]map[uint8]*ResourceChain),
@@ -108,29 +118,6 @@ func (v *Vault) RetrieveTransaction(txKey string, txId string) (string, string, 
 		return "", "", err
 	}
 	return txResp.TransactionStatus, txResp.TransactionSubStatus, nil
-}
-
-func (v *Vault) SendTransaction(destinationAddress string, coinKey string, txAmount string, failOnContract bool) (string, error) {
-	createTransactionsRequest := api.CreateTransactionsRequest{
-		SourceAccountKey:       viper.GetString("accountKey"),
-		SourceAccountType:      "VAULT_ACCOUNT",
-		DestinationAccountType: "WHITELISTING_ACCOUNT",
-		DestinationAddress:     destinationAddress,
-		CoinKey:                coinKey,
-		TxAmount:               txAmount,
-		TxFeeLevel:             "MIDDLE",
-		CustomerRefId:          uuid.New().String(),
-		FailOnContract:         &failOnContract,
-	}
-
-	var txKeyResult api.TxKeyResult
-	if err := v.transactionApi.CreateTransactions(createTransactionsRequest, &txKeyResult); err != nil {
-		v.log.Error("SendTransaction", "err", fmt.Errorf("failed to send transaction, %w", err))
-		return "", err
-	}
-
-	v.log.Info("transaction has been created", "txKey", txKeyResult.TxKey)
-	return txKeyResult.TxKey, nil
 }
 
 func AsStringFromFloat(precision int, amount *big.Float) (string, error) {

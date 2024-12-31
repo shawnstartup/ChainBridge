@@ -1,4 +1,4 @@
-package main
+package cosigner
 
 import (
 	"crypto/rand"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ChainSafe/ChainBridge/vault/secretes"
+	"github.com/ChainSafe/ChainBridge/safeheron/utils"
 )
 
 type CoSignerConverter struct {
@@ -38,27 +38,27 @@ func (c *CoSignerConverter) RequestConvert(d CoSignerCallBack, bizPrivateKey *rs
 		"bizContent": d.BizContent,
 	}
 	// Verify sign
-	verifyRet := secretes.VerifySignWithRSA(serializeParams(responseStringMap), d.Sig, c.Config.ApiPubKey)
+	verifyRet := utils.VerifySignWithRSA(serializeParams(responseStringMap), d.Sig, c.Config.ApiPubKey)
 	if !verifyRet {
 		return "", errors.New("CoSignerCallBack signature verification failed")
 	}
 	// Use your RSA private key to decrypt response's aesKey and aesIv
 
 	var plaintext []byte
-	if d.RsaType == secretes.ECB_OAEP {
-		plaintext, _ = secretes.DecryptWithOAEP(d.Key, bizPrivateKey)
+	if d.RsaType == utils.ECB_OAEP {
+		plaintext, _ = utils.DecryptWithOAEP(d.Key, bizPrivateKey)
 	} else {
-		plaintext, _ = secretes.DecryptWithRSA(d.Key, bizPrivateKey)
+		plaintext, _ = utils.DecryptWithRSA(d.Key, bizPrivateKey)
 	}
 	resAesKey := plaintext[:32]
 	resAesIv := plaintext[32:]
 	// Use AES to decrypt bizContent
 	ciphertext, _ := base64.StdEncoding.DecodeString(d.BizContent)
 	var callBackContent []byte
-	if d.AesType == secretes.GCM {
-		callBackContent, _ = secretes.NewGCMDecrypter(resAesKey, resAesIv, ciphertext)
+	if d.AesType == utils.GCM {
+		callBackContent, _ = utils.NewGCMDecrypter(resAesKey, resAesIv, ciphertext)
 	} else {
-		callBackContent, _ = secretes.NewCBCDecrypter(resAesKey, resAesIv, ciphertext)
+		callBackContent, _ = utils.NewCBCDecrypter(resAesKey, resAesIv, ciphertext)
 	}
 	return string(callBackContent), nil
 }
@@ -84,7 +84,7 @@ func (c *CoSignerConverter) ResponseConverter(d any, bizPrivateKey *rsa.PrivateK
 	if d != nil {
 		payLoad, _ := json.Marshal(d)
 		data := string(payLoad)
-		encryptBizContent, err := secretes.EncryContentWithAES(data, aesKey, aesIv)
+		encryptBizContent, err := utils.EncryContentWithAES(data, aesKey, aesIv)
 		if err != nil {
 			return nil, err
 		}
@@ -92,14 +92,14 @@ func (c *CoSignerConverter) ResponseConverter(d any, bizPrivateKey *rsa.PrivateK
 	}
 
 	// Use Safeheron RSA public key to encrypt request's aesKey and aesIv
-	encryptedKeyAndIv, err := secretes.EncryptWithRSA(append(aesKey, aesIv...), c.Config.ApiPubKey)
+	encryptedKeyAndIv, err := utils.EncryptWithRSA(append(aesKey, aesIv...), c.Config.ApiPubKey)
 	if err != nil {
 		return nil, err
 	}
 	params["key"] = encryptedKeyAndIv
 
 	// Sign the request data with your RSA private key
-	signature, err := secretes.SignParamsWithRSA(serializeParams(params), bizPrivateKey)
+	signature, err := utils.SignParamsWithRSA(serializeParams(params), bizPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (c *CoSignerConverter) ResponseConverterWithNewCryptoType(d any, bizPrivate
 	if d != nil {
 		payLoad, _ := json.Marshal(d)
 		data := string(payLoad)
-		encryptBizContent, err := secretes.EncryContentWithAESGCM(data, aesKey, aesIv)
+		encryptBizContent, err := utils.EncryContentWithAESGCM(data, aesKey, aesIv)
 		if err != nil {
 			return nil, err
 		}
@@ -130,20 +130,20 @@ func (c *CoSignerConverter) ResponseConverterWithNewCryptoType(d any, bizPrivate
 	}
 
 	// Use Safeheron RSA public key to encrypt request's aesKey and aesIv
-	encryptedKeyAndIv, err := secretes.EncryptWithOAEP(append(aesKey, aesIv...), c.Config.ApiPubKey)
+	encryptedKeyAndIv, err := utils.EncryptWithOAEP(append(aesKey, aesIv...), c.Config.ApiPubKey)
 	if err != nil {
 		return nil, err
 	}
 	params["key"] = encryptedKeyAndIv
 
 	// Sign the request data with your RSA private key
-	signature, err := secretes.SignParamsWithRSA(serializeParams(params), bizPrivateKey)
+	signature, err := utils.SignParamsWithRSA(serializeParams(params), bizPrivateKey)
 	if err != nil {
 		return nil, err
 	}
 	params["sig"] = signature
-	params["rsaType"] = secretes.ECB_OAEP
-	params["aesType"] = secretes.GCM
+	params["rsaType"] = utils.ECB_OAEP
+	params["aesType"] = utils.GCM
 	return params, nil
 }
 

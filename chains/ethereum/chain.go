@@ -22,6 +22,7 @@ package ethereum
 
 import (
 	"fmt"
+	"github.com/ChainSafe/ChainBridge/vault"
 	"math/big"
 
 	bridge "github.com/ChainSafe/ChainBridge/bindings/Bridge"
@@ -90,7 +91,7 @@ func setupBlockstore(cfg *Config, kp *secp256k1.Keypair) (*blockstore.Blockstore
 	return bs, nil
 }
 
-func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr chan<- error, m *metrics.ChainMetrics) (*Chain, error) {
+func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr chan<- error, m *metrics.ChainMetrics, vault *vault.Vault) (*Chain, error) {
 	cfg, err := parseChainConfig(chainCfg)
 	if err != nil {
 		return nil, err
@@ -172,7 +173,7 @@ func InitializeChain(chainCfg *core.ChainConfig, logger log15.Logger, sysErr cha
 	listener := NewListener(conn, cfg, logger, bs, stop, sysErr, m)
 	listener.setContracts(bridgeContract, erc20HandlerContract, erc721HandlerContract, genericHandlerContract)
 
-	writer := NewWriter(conn, cfg, logger, stop, sysErr, m)
+	writer := NewWriter(conn, cfg, logger, stop, sysErr, m, vault)
 	writer.setContract(bridgeContract)
 
 	return &Chain{
