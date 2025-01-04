@@ -1,4 +1,4 @@
-package secretes
+package secrets
 
 import (
 	"bytes"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/ChainSafe/ChainBridge/safeheron"
 	"github.com/ChainSafe/ChainBridge/safeheron/api"
-	"github.com/ChainSafe/ChainBridge/vault/secretes"
+	"github.com/ChainSafe/ChainBridge/vault/secrets"
 	"github.com/ChainSafe/chainbridge-utils/keystore"
 	"github.com/ChainSafe/log15"
 	"github.com/spf13/viper"
@@ -42,7 +42,7 @@ func NewVault(log log15.Logger) *Vault {
 
 	pswd := keystore.GetPassword(fmt.Sprintf("Enter password for key %s:", viper.GetString("privateKeyPemFile")))
 	password := string(pswd)
-	apiPrivateKey, err := secretes.LoadEncrypedPrivateKeyFromPath(viper.GetString("privateKeyPemFile"), password)
+	apiPrivateKey, err := secrets.LoadEncrypedPrivateKeyFromPath(viper.GetString("privateKeyPemFile"), password)
 	if err != nil {
 		panic(fmt.Errorf("error reading encrpted privateKey pem file, %w", err))
 	}

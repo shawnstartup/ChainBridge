@@ -1,4 +1,4 @@
-package secretes
+package secrets
 
 import (
 	"crypto/aes"
@@ -69,4 +69,40 @@ func LoadEncrypedPrivateKeyFromPath(path string, password string) (*rsa.PrivateK
 
 	privateKey, err := x509.ParsePKCS8PrivateKey(pemBlock.Bytes)
 	return privateKey.(*rsa.PrivateKey), err
+}
+
+func GenerateEncrypedPEMFromPath(originFilepath string, targetFilePath, password string) error {
+	data, err := os.ReadFile(originFilepath)
+	if err != nil {
+		panic(err)
+	}
+	encryptedBlock, err := encryptPEMBlock(data, password)
+	if err != nil {
+		panic(err)
+	}
+	pemData := pem.EncodeToMemory(encryptedBlock)
+	if err := os.WriteFile(targetFilePath, pemData, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DecryptPEMFromPath(originFilepath string, targetFilePath, password string) error {
+	pemData, err := os.ReadFile(originFilepath)
+	if err != nil {
+		panic(err)
+	}
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		panic("failed to decode PEM block")
+	}
+	decryptedData, err := decryptPEMBlock(block, password)
+	if err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile(targetFilePath, decryptedData, 0644); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -16,7 +16,7 @@ import (
 	cosigner "github.com/ChainSafe/ChainBridge/safeheron/cosigner"
 	utils "github.com/ChainSafe/ChainBridge/shared/ethereum"
 	vault "github.com/ChainSafe/ChainBridge/vault"
-	secretes "github.com/ChainSafe/ChainBridge/vault/secretes"
+	secretes "github.com/ChainSafe/ChainBridge/vault/secrets"
 	"github.com/ChainSafe/chainbridge-utils/core"
 	"github.com/ChainSafe/chainbridge-utils/keystore"
 	"github.com/ChainSafe/chainbridge-utils/msg"

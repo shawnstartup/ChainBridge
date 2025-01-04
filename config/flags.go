@@ -101,3 +101,22 @@ var (
 		Usage: "Applies a predetermined test keystore to the chains.",
 	}
 )
+
+var (
+	EncryptFlag = &cli.StringFlag{
+		Name:  "encrypt",
+		Usage: "Generate the encrypted pem file.",
+	}
+	DecryptFlag = &cli.StringFlag{
+		Name:  "decrypt",
+		Usage: "Decrypt the encrypted pem file.",
+	}
+	SrcFilepathFlag = &cli.StringFlag{
+		Name:  "src",
+		Usage: "Source PEM filepath to be encrypt/decrypt.",
+	}
+	DstFilepathFlag = &cli.StringFlag{
+		Name:  "dst",
+		Usage: "Destination PEM filepath to be store.",
+	}
+)

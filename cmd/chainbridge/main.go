@@ -61,6 +61,15 @@ var importFlags = []cli.Flag{
 	config.SubkeyNetworkFlag,
 }
 
+var secretFlags = []cli.Flag{
+	config.EncryptFlag,
+}
+
+var encryptFlags = []cli.Flag{
+	config.SrcFilepathFlag,
+	config.DstFilepathFlag,
+}
+
 var accountCommand = cli.Command{
 	Name:  "accounts",
 	Usage: "manage bridge keystore",
@@ -98,6 +107,28 @@ var accountCommand = cli.Command{
 	},
 }
 
+var secretCommand = cli.Command{
+	Name:        "secret",
+	Usage:       "pem file encrypt tools",
+	Description: "The secret command is used to encrypt/decrypt the pem files.\n",
+	Subcommands: []*cli.Command{
+		{
+			Action:      handleEncryptCmd,
+			Name:        "encrypt",
+			Usage:       "generate encrypted pem",
+			Flags:       encryptFlags,
+			Description: "The encrypt subcommand is used to generate the encrypted pem file.\n",
+		},
+		{
+			Action:      handleEncryptCmd,
+			Name:        "decrypt",
+			Usage:       "decrypt the encrypted pem",
+			Flags:       encryptFlags,
+			Description: "The decrypt subcommand is used to generate the decrypted pem file.\n",
+		},
+	},
+}
+
 var (
 	Version = "0.0.1"
 )
@@ -113,6 +144,7 @@ func init() {
 	app.EnableBashCompletion = true
 	app.Commands = []*cli.Command{
 		&accountCommand,
+		&secretCommand,
 	}
 
 	app.Flags = append(app.Flags, cliFlags...)
