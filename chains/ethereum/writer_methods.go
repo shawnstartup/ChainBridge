@@ -557,7 +557,8 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 			amount := big.NewInt(0).SetBytes(m.Payload[0].([]byte))
 			//recipientBytes := m.Payload[1]
 
-			customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, time.Now().Unix())
+			//customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, time.Now().Unix())
+			customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, 0)
 			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefIdWithTimestamp, amount, false)
 			if err != nil {
 				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "amount", amount.String(), "err", err)
