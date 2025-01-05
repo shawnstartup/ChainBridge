@@ -525,6 +525,29 @@ func (w *writer) createVaultProposal(m msg.Message, dataHash [32]byte) {
 }
 
 func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
+	// call vault api to transfer tokens from vault wallet
+	addr, err := w.bridgeContract.ResourceIDToHandlerAddress(&bind.CallOpts{From: w.conn.Keypair().CommonAddress()}, m.ResourceId)
+	if err != nil {
+		w.log.Error("failed to get handler from resource ID", "resourceId", m.ResourceId, "err", err)
+		return
+	}
+
+	//  make Raw with below cutomer fields for audit by cosigner callback service
+	txId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
+	w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String())
+	amount := big.NewInt(0).SetBytes(m.Payload[0].([]byte))
+	//recipientBytes := m.Payload[1]
+
+	//customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, time.Now().Unix())
+	customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, 0)
+	txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefIdWithTimestamp, amount, false)
+	if err != nil {
+		w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "amount", amount.String(), "err", err)
+		return
+		// TODO handle err
+	}
+	w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "customerRefId", customerRefIdWithTimestamp, "txKey", txKey, "amount", amount.String())
+
 	for i := 0; i < TxRetryLimit; i++ {
 		select {
 		case <-w.stop:
@@ -542,30 +565,6 @@ func (w *writer) executeVaultProposal(m msg.Message, dataHash [32]byte) {
 			// here but for all the logging after line 272 the w.conn.Opts() is unlocked and could be changed by another process
 			gasLimit := w.conn.Opts().GasLimit
 			gasPrice := w.conn.Opts().GasPrice
-
-			// call vault api to transfer tokens from vault wallet
-			addr, err := w.bridgeContract.ResourceIDToHandlerAddress(&bind.CallOpts{From: w.conn.Keypair().CommonAddress()}, m.ResourceId)
-			if err != nil {
-				w.log.Error("failed to get handler from resource ID", "resourceId", m.ResourceId, "err", err)
-				time.Sleep(TxRetryInterval)
-				continue
-			}
-
-			//  make Raw with below cutomer fields for audit by cosigner callback service
-			txId := w.vault.MakeCustomerRefId(uint8(m.Source), uint8(m.Destination), uint64(m.DepositNonce))
-			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String())
-			amount := big.NewInt(0).SetBytes(m.Payload[0].([]byte))
-			//recipientBytes := m.Payload[1]
-
-			//customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, time.Now().Unix())
-			customerRefIdWithTimestamp := fmt.Sprintf("%s-timestamp-%d", txId, 0)
-			txKey, err := w.vault.SendVaultTransaction(uint8(m.Destination), "0x"+m.ResourceId.Hex(), addr.String(), customerRefIdWithTimestamp, amount, false)
-			if err != nil {
-				w.log.Error("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "amount", amount.String(), "err", err)
-				time.Sleep(TxRetryInterval)
-				return
-			}
-			w.log.Info("Vault sendTransaction", "destinationChainId", m.Destination, "destinationAddress", addr.String(), "customerRefId", customerRefIdWithTimestamp, "txKey", txKey, "amount", amount.String())
 
 			tx, err := w.bridgeContract.PassVaultProposal(
 				w.conn.Opts(),
