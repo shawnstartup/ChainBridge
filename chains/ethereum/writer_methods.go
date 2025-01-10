@@ -248,9 +248,8 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 	vaultTxCompleted := false
 
 	var startBlock = big.NewInt(latestBlock.Int64())
-	var currentBlock = startBlock
+	var currentBlock = big.NewInt(latestBlock.Int64())
 	// watching for the latest block, querying and matching the finalized event will be retried up to ExecuteBlockWatchLimit times
-	// TODO determin num of ExecuteBlockWatchLimit, should consider small amount and big amount
 	for currentBlock.Int64() < startBlock.Int64()+ExecuteBlockWatchLimit {
 		select {
 		case <-w.stop:
@@ -272,13 +271,13 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 				}
 			}
 
-			// query for ProposalEvent logs
 			endBlock := new(big.Int).Add(currentBlock, big.NewInt(w.cfg.blockConfirmations.Int64()-1))
+
+			// query for ProposalEvent logs
 			query := buildQuery(w.cfg.bridgeContract, utils.ProposalEvent, currentBlock, endBlock)
 			evts, err := w.conn.Client().FilterLogs(context.Background(), query)
 			if err != nil {
 				w.log.Error("Failed to fetch logs", "err", err)
-				return
 			}
 			// execute the proposal once we find the matching finalized event
 			for _, evt := range evts {
@@ -293,13 +292,13 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 					vaultProp, err := w.bridgeContract.GetVaultProposal(w.conn.CallOpts(), uint8(sourceId), depositNonce, dataHash)
 					if err != nil {
 						w.log.Error("Failed to check vault proposal existence", "err", err)
-						return
-					}
-					if vaultProp.Status == VaultInactiveStatus {
-						w.createVaultProposal(m, dataHash)
-						w.log.Info("createVaultProposal", "src", sourceId, "nonce", depositNonce)
 					} else {
-						w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce, "vaultStatus", vaultProp.Status)
+						if vaultProp.Status == VaultInactiveStatus {
+							w.createVaultProposal(m, dataHash)
+							w.log.Info("createVaultProposal", "src", sourceId, "nonce", depositNonce)
+						} else {
+							w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce, "vaultStatus", vaultProp.Status)
+						}
 					}
 				} else {
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
@@ -311,8 +310,7 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 			query = buildQuery(w.cfg.bridgeContract, utils.VaultProposalEvent, currentBlock, endBlock)
 			evts, err = w.conn.Client().FilterLogs(context.Background(), query)
 			if err != nil {
-				w.log.Error("Failed to fetch logs", "err", err)
-				return
+				w.log.Error("Failed to fetch vault logs", "err", err)
 			}
 
 			// execute the proposal once we find the matching finalized event
@@ -336,9 +334,9 @@ func (w *writer) watchThenExecute(m msg.Message, data []byte, dataHash [32]byte,
 					vaultProposalEvent, err := w.bridgeContract.ParseVaultProposalEvent(evt)
 					if err != nil {
 						w.log.Error("Failed to ParseVaultProposalEvent", "err", err)
-						return
+					} else {
+						vaultTxKey = vaultProposalEvent.TxKey
 					}
-					vaultTxKey = vaultProposalEvent.TxKey
 				} else {
 					w.log.Trace("Ignoring event", "src", sourceId, "nonce", depositNonce)
 				}
@@ -520,7 +518,7 @@ func (w *writer) createVaultProposal(m msg.Message, dataHash [32]byte) {
 			}
 		}
 	}
-	w.log.Error("Execution of VaultProposal transaction failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce)
+	w.log.Error("Creation of VaultProposal transaction failed", "source", m.Source, "dest", m.Destination, "depositNonce", m.DepositNonce)
 	w.sysErr <- ErrFatalTx
 }
 
