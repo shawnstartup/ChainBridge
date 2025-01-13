@@ -135,8 +135,10 @@ func (w *writer) createErc20Proposal(m msg.Message) bool {
 				w.log.Error("Failed to check vault proposal existence", "err", err)
 				return false
 			}
-			if vaultProp.Status == VaultInactiveStatus {
-				w.createVaultProposal(m, dataHash)
+			if vaultProp.Status == VaultExecutedStatus {
+				w.executeProposal(m, data, dataHash)
+				return true
+			} else {
 				// watch for execution event
 				// Capture latest block so when know where to watch from
 				latestBlock, err := w.conn.LatestBlock()
@@ -145,12 +147,6 @@ func (w *writer) createErc20Proposal(m msg.Message) bool {
 					return false
 				}
 				go w.watchThenExecute(m, data, dataHash, latestBlock)
-				return true
-			} else if vaultProp.Status == VaultExecutedStatus {
-				w.executeProposal(m, data, dataHash)
-				return true
-			} else {
-				w.log.Trace("Ignoring event", "src", m.Source, "nonce", m.DepositNonce, "vaultStatus", vaultProp.Status)
 				return true
 			}
 		} else {
