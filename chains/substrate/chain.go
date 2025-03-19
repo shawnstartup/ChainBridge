@@ -7,23 +7,25 @@ The current supported transfer types are Fungible, Nonfungible, and generic.
 
 There are 3 major components: the connection, the listener, and the writer.
 
-Connection
+# Connection
 
 The Connection handles connecting to the substrate client, and submitting transactions to the client.
 It also handles state queries. The connection is shared by the writer and listener.
 
-Listener
+# Listener
 
 The substrate listener polls blocks and parses the associated events for the three transfer types. It then forwards these into the router.
 
-Writer
+# Writer
 
 As the writer receives messages from the router, it constructs proposals. If a proposal is still active, the writer will attempt to vote on it. Resource IDs are resolved to method name on-chain, which are then used in the proposals when constructing the resulting Call struct.
-
 */
 package substrate
 
 import (
+	"github.com/ChainSafe/ChainBridge/bindings/Bridge"
+	"github.com/ChainSafe/ChainBridge/bindings/ERC20Handler"
+	"github.com/ChainSafe/ChainBridge/chains"
 	"github.com/ChainSafe/chainbridge-utils/blockstore"
 	"github.com/ChainSafe/chainbridge-utils/core"
 	"github.com/ChainSafe/chainbridge-utils/crypto/sr25519"
@@ -35,12 +37,35 @@ import (
 
 var _ core.Chain = &Chain{}
 
+var _ chains.ChainHandler = &Chain{}
+
 type Chain struct {
 	cfg      *core.ChainConfig // The config of the chain
 	conn     *Connection       // THe chains connection
 	listener *listener         // The listener of this chain
 	writer   *writer           // The writer of the chain
 	stop     chan<- int
+}
+
+func (c *Chain) GetProposal(record ERC20Handler.ERC20HandlerDepositRecord, sourceChainId uint8, nonce msg.Nonce) (Bridge.BridgeProposal, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Chain) GetVaultProposal(record ERC20Handler.ERC20HandlerDepositRecord, sourceChainId uint8, nonce msg.Nonce) (Bridge.BridgeVaultProposal, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Chain) HandleErc20DepositedRecord(erc20DepositRecored ERC20Handler.ERC20HandlerDepositRecord, nonce msg.Nonce) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+// QueryErc20DepositRecord looks for the deposit record on the destination chain
+func (c *Chain) QueryErc20DepositRecord(destId msg.ChainId, nonce msg.Nonce) (ERC20Handler.ERC20HandlerDepositRecord, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 // checkBlockstore queries the blockstore for the latest known block. If the latest block is

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/ChainSafe/ChainBridge/bindings/Bridge"
 	"github.com/ChainSafe/ChainBridge/vault"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"math/big"
@@ -116,6 +117,20 @@ func (w *writer) shouldVote(m msg.Message, dataHash [32]byte) bool {
 	}
 
 	return true
+}
+
+func (w *writer) GetVaultProposal(m msg.Message) (Bridge.BridgeVaultProposal, error) {
+	data := ConstructErc20ProposalData(m.Payload[0].([]byte), m.Payload[1].([]byte))
+	dataHash := utils.Hash(append(w.cfg.erc20HandlerContract.Bytes(), data...))
+
+	return w.bridgeContract.GetVaultProposal(w.conn.CallOpts(), uint8(m.Source), uint64(m.DepositNonce), dataHash)
+}
+
+func (w *writer) GetProposal(m msg.Message) (Bridge.BridgeProposal, error) {
+	data := ConstructErc20ProposalData(m.Payload[0].([]byte), m.Payload[1].([]byte))
+	dataHash := utils.Hash(append(w.cfg.erc20HandlerContract.Bytes(), data...))
+
+	return w.bridgeContract.GetProposal(w.conn.CallOpts(), uint8(m.Source), uint64(m.DepositNonce), dataHash)
 }
 
 // createErc20Proposal creates an Erc20 proposal.

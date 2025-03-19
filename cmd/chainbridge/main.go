@@ -10,15 +10,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/ChainSafe/ChainBridge/vault"
-	"net/http"
-	"os"
-
-	"strconv"
-
+	"github.com/ChainSafe/ChainBridge/chains"
 	"github.com/ChainSafe/ChainBridge/chains/ethereum"
 	"github.com/ChainSafe/ChainBridge/chains/substrate"
 	"github.com/ChainSafe/ChainBridge/config"
+	"github.com/ChainSafe/ChainBridge/vault"
 	"github.com/ChainSafe/chainbridge-utils/core"
 	"github.com/ChainSafe/chainbridge-utils/metrics/health"
 	metrics "github.com/ChainSafe/chainbridge-utils/metrics/types"
@@ -26,6 +22,9 @@ import (
 	log "github.com/ChainSafe/log15"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
+	"net/http"
+	"os"
+	"strconv"
 )
 
 var app = cli.NewApp()
@@ -133,6 +132,10 @@ var (
 	Version = "0.0.1"
 )
 
+var (
+	handlerRegistry map[msg.ChainId]chains.ChainHandler
+)
+
 // init initializes CLI
 func init() {
 	app.Action = run
@@ -180,6 +183,7 @@ func run(ctx *cli.Context) error {
 	}
 
 	log.Info("Starting ChainBridge...")
+	handlerRegistry = make(map[msg.ChainId]chains.ChainHandler)
 
 	cfg, err := config.GetConfig(ctx)
 	if err != nil {
@@ -220,7 +224,7 @@ func run(ctx *cli.Context) error {
 			LatestBlock:    ctx.Bool(config.LatestBlockFlag.Name),
 			Opts:           chain.Opts,
 		}
-		var newChain core.Chain
+		var newChain chains.ChainHandler
 		var m *metrics.ChainMetrics
 
 		logger := log.Root().New("chain", chainConfig.Name)
@@ -242,6 +246,8 @@ func run(ctx *cli.Context) error {
 		}
 		c.AddChain(newChain)
 
+		handlerRegistry[newChain.Id()] = newChain
+
 	}
 
 	// Start prometheus and health server
@@ -260,6 +266,9 @@ func run(ctx *cli.Context) error {
 		go func() {
 			http.Handle("/metrics", promhttp.Handler())
 			http.HandleFunc("/health", h.HealthStatus)
+			http.HandleFunc("/queryProposal", queryProposalHandler)
+			http.HandleFunc("/executeProposal", executeProposalHandler)
+
 			err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 			if errors.Is(err, http.ErrServerClosed) {
 				log.Info("Health status server is shutting down", err)

@@ -22,6 +22,7 @@ package ethereum
 
 import (
 	"fmt"
+	"github.com/ChainSafe/ChainBridge/chains"
 	"github.com/ChainSafe/ChainBridge/vault"
 	"math/big"
 
@@ -45,7 +46,11 @@ import (
 
 var _ core.Chain = &Chain{}
 
-var _ Connection = &connection.Connection{}
+var _ chains.ChainHandler = &Chain{}
+
+var (
+	_ Connection = &connection.Connection{}
+)
 
 type Connection interface {
 	Connect() error
@@ -67,6 +72,37 @@ type Chain struct {
 	listener *listener         // The listener of this chain
 	writer   *writer           // The writer of the chain
 	stop     chan<- int
+}
+
+func (c *Chain) GetProposal(record erc20Handler.ERC20HandlerDepositRecord, sourceChainId uint8, nonce msg.Nonce) (bridge.BridgeProposal, error) {
+	return c.writer.GetProposal(msg.NewFungibleTransfer(
+		msg.ChainId(sourceChainId),
+		msg.ChainId(record.DestinationChainID),
+		nonce,
+		record.Amount,
+		record.ResourceID,
+		record.DestinationRecipientAddress,
+	))
+}
+
+func (c *Chain) GetVaultProposal(record erc20Handler.ERC20HandlerDepositRecord, sourceChainId uint8, nonce msg.Nonce) (bridge.BridgeVaultProposal, error) {
+	return c.writer.GetVaultProposal(msg.NewFungibleTransfer(
+		msg.ChainId(sourceChainId),
+		msg.ChainId(record.DestinationChainID),
+		nonce,
+		record.Amount,
+		record.ResourceID,
+		record.DestinationRecipientAddress,
+	))
+}
+
+func (c *Chain) HandleErc20DepositedRecord(erc20DepositRecored erc20Handler.ERC20HandlerDepositRecord, nonce msg.Nonce) error {
+	return c.listener.handleErc20DepositedRecord(erc20DepositRecored, nonce)
+}
+
+// QueryErc20DepositRecord looks for the deposit record on the destination chain
+func (c *Chain) QueryErc20DepositRecord(destId msg.ChainId, nonce msg.Nonce) (erc20Handler.ERC20HandlerDepositRecord, error) {
+	return c.listener.QueryErc20DepositRecord(destId, nonce)
 }
 
 // checkBlockstore queries the blockstore for the latest known block. If the latest block is

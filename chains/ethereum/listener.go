@@ -161,6 +161,17 @@ func (l *listener) pollBlocks() error {
 	}
 }
 
+// QueryErc20DepositRecord looks for the deposit record on the destination chain
+func (l *listener) QueryErc20DepositRecord(destId msg.ChainId, nonce msg.Nonce) (ERC20Handler.ERC20HandlerDepositRecord, error) {
+	l.log.Info("Querying fungible deposit event", "dest", destId, "nonce", nonce)
+	record, err := l.erc20HandlerContract.GetDepositRecord(&bind.CallOpts{From: l.conn.Keypair().CommonAddress()}, uint64(nonce), uint8(destId))
+	if err != nil {
+		l.log.Error("Error Unpacking ERC20 Deposit Record", "err", err)
+		return ERC20Handler.ERC20HandlerDepositRecord{}, err
+	}
+	return record, nil
+}
+
 // getDepositEventsForBlock looks for the deposit event in the latest block
 func (l *listener) getDepositEventsForBlock(startBlock *big.Int, endBlock *big.Int) error {
 	l.log.Debug("Querying block for deposit events", "block", startBlock)
@@ -203,6 +214,37 @@ func (l *listener) getDepositEventsForBlock(startBlock *big.Int, endBlock *big.I
 		if err != nil {
 			l.log.Error("subscription error: failed to route message", "err", err)
 		}
+	}
+
+	return nil
+}
+
+func (l *listener) handleErc20DepositedRecord(erc20DepositRecored ERC20Handler.ERC20HandlerDepositRecord, nonce msg.Nonce) error {
+	l.log.Debug("handleErc20DepositedRecord for erc20DepositRecored", "DestinationChainID", erc20DepositRecored.DestinationChainID, "Amount", erc20DepositRecored.Amount)
+
+	var m msg.Message
+	destId := msg.ChainId(erc20DepositRecored.DestinationChainID)
+	rId := msg.ResourceIdFromSlice(erc20DepositRecored.ResourceID[:])
+
+	addr, err := l.bridgeContract.ResourceIDToHandlerAddress(&bind.CallOpts{From: l.conn.Keypair().CommonAddress()}, rId)
+	if err != nil {
+		return fmt.Errorf("failed to get handler from resource ID %x", rId)
+	}
+
+	if addr == l.cfg.erc20HandlerContract {
+		m, err = l.handleErc20DepositedEvent(destId, nonce)
+	} else {
+		l.log.Error("depositRecored has unrecognized handler", "handler", addr.Hex())
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = l.router.Send(m)
+	if err != nil {
+		l.log.Error("subscription error: failed to route message", "err", err)
 	}
 
 	return nil
