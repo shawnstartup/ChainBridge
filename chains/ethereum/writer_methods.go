@@ -157,7 +157,19 @@ func (w *writer) createErc20Proposal(m msg.Message) bool {
 				w.executeVaultProposal(m, dataHash)
 			} else if vaultProp.Status == VaultInactiveStatus {
 				w.createVaultProposal(m, dataHash)
-			} else {
+			} else if vaultProp.Status == VaultPassedStatus {
+				// retrieve vault transaction
+				vaultTxKey := vaultProp.TxKey
+				if vaultTxKey != "" {
+					txStatus, txSubStatus, err := w.vault.RetrieveTransaction(vaultTxKey, "")
+					if err != nil {
+						w.log.Error("Unable to retrieve vault transaction", "err", err, "txKey", vaultTxKey, "txStatus", txStatus, "txSubStatus", txSubStatus)
+					}
+					if txStatus == vault.TxStatusCompleted {
+						// completeVaultProposal
+						w.completeVaultProposal(m, dataHash)
+					}
+				}
 			}
 
 			// watch for execution event
