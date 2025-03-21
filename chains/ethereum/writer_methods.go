@@ -153,17 +153,23 @@ func (w *writer) createErc20Proposal(m msg.Message) bool {
 			if vaultProp.Status == VaultExecutedStatus {
 				w.executeProposal(m, data, dataHash)
 				return true
+			} else if vaultProp.Status == VaultActiveStatus {
+				w.executeVaultProposal(m, dataHash)
+			} else if vaultProp.Status == VaultInactiveStatus {
+				w.createVaultProposal(m, dataHash)
 			} else {
-				// watch for execution event
-				// Capture latest block so when know where to watch from
-				latestBlock, err := w.conn.LatestBlock()
-				if err != nil {
-					w.log.Error("Unable to fetch latest block", "err", err)
-					return false
-				}
-				go w.watchThenExecute(m, data, dataHash, latestBlock)
-				return true
 			}
+
+			// watch for execution event
+			// Capture latest block so when know where to watch from
+			latestBlock, err := w.conn.LatestBlock()
+			if err != nil {
+				w.log.Error("Unable to fetch latest block", "err", err)
+				return false
+			}
+			go w.watchThenExecute(m, data, dataHash, latestBlock)
+			return true
+
 		} else {
 			return false
 		}
