@@ -17,7 +17,7 @@ import (
 
 const DefaultGasLimit = 6721975
 const DefaultGasPrice = 20000000000
-const DefaultBlockConfirmations = 10
+const DefaultBlockConfirmations = 30
 const DefaultGasMultiplier = 1
 
 // Chain specific options
