@@ -116,9 +116,11 @@ func (l *listener) pollBlocks() error {
 				l.log.Error("Continue to get latest block", "block", currentBlock, "retry", retry, "err", err)
 				continue
 			}
+			l.log.Debug("Get latest block", "latestBlock", latestBlock)
 
 			if l.metrics != nil {
 				l.metrics.LatestKnownBlock.Set(float64(latestBlock.Int64()))
+				l.log.Debug("Get latest block", "latestBlock", float64(latestBlock.Int64()))
 			}
 
 			// Sleep if the difference is less than BlockDelay; (latest - current) < BlockDelay
