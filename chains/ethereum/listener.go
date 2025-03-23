@@ -120,7 +120,7 @@ func (l *listener) pollBlocks() error {
 
 			if l.metrics != nil {
 				l.metrics.LatestKnownBlock.Set(float64(latestBlock.Int64()))
-				l.log.Debug("Get latest block", "latestBlock", float64(latestBlock.Int64()))
+				l.log.Debug("LatestKnownBlock.Set", "latestBlock", float64(latestBlock.Int64()))
 			}
 
 			// Sleep if the difference is less than BlockDelay; (latest - current) < BlockDelay

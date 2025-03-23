@@ -255,11 +255,11 @@ func (c *Connection) UnlockOpts() {
 
 // LatestBlock returns the latest block from the current chain
 func (c *Connection) LatestBlock() (*big.Int, error) {
-	header, err := c.conn.HeaderByNumber(context.Background(), nil)
+	number, err := c.conn.BlockNumber(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	return header.Number, nil
+	return big.NewInt(int64(number)), nil
 }
 
 // EnsureHasBytecode asserts if contract code exists at the specified address
