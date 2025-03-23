@@ -110,9 +110,10 @@ func (l *listener) pollBlocks() error {
 
 			latestBlock, err := l.conn.LatestBlock()
 			if err != nil {
-				l.log.Error("Unable to get latest block", "block", currentBlock, "err", err)
+				l.log.Error("Unable to get latest block", "block", currentBlock, "retry", retry, "err", err)
 				retry--
 				time.Sleep(BlockRetryInterval)
+				l.log.Error("Continue to get latest block", "block", currentBlock, "retry", retry, "err", err)
 				continue
 			}
 
@@ -122,8 +123,9 @@ func (l *listener) pollBlocks() error {
 
 			// Sleep if the difference is less than BlockDelay; (latest - current) < BlockDelay
 			if big.NewInt(0).Sub(latestBlock, currentBlock).Cmp(l.blockConfirmations) == -1 {
-				l.log.Debug("Block not ready, will retry", "target", currentBlock, "latest", latestBlock)
+				l.log.Debug("Block not ready, will retry", "currentBlock", currentBlock, "latest", latestBlock)
 				time.Sleep(BlockRetryInterval)
+				l.log.Debug("Continue retry", "currentBlock", currentBlock, "latest", latestBlock)
 				continue
 			}
 
@@ -135,7 +137,7 @@ func (l *listener) pollBlocks() error {
 
 			err = l.getDepositEventsForBlock(currentBlock, endBlock)
 			if err != nil {
-				l.log.Error("Failed to get events for block", "block", currentBlock, "err", err)
+				l.log.Error("Failed to get events for block", "currentBlock", currentBlock, "endBlock", endBlock, "err", err)
 				retry--
 				continue
 			}
@@ -143,15 +145,15 @@ func (l *listener) pollBlocks() error {
 			// Write to block store. Not a critical operation, no need to retry
 			err = l.blockstore.StoreBlock(endBlock)
 			if err != nil {
-				l.log.Error("Failed to write latest block to blockstore", "block", currentBlock, "err", err)
+				l.log.Error("Failed to write latest block to blockstore", "block", endBlock, "err", err)
 			}
 
 			if l.metrics != nil {
 				l.metrics.BlocksProcessed.Inc()
-				l.metrics.LatestProcessedBlock.Set(float64(latestBlock.Int64()))
+				l.metrics.LatestProcessedBlock.Set(float64(endBlock.Int64()))
 			}
 
-			l.latestBlock.Height = big.NewInt(0).Set(latestBlock)
+			l.latestBlock.Height = big.NewInt(0).Set(endBlock)
 			l.latestBlock.LastUpdated = time.Now()
 
 			// Goto next block and reset retry counter
