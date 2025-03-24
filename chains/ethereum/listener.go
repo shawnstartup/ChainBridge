@@ -179,7 +179,7 @@ func (l *listener) QueryErc20DepositRecord(destId msg.ChainId, nonce msg.Nonce) 
 
 // getDepositEventsForBlock looks for the deposit event in the latest block
 func (l *listener) getDepositEventsForBlock(startBlock *big.Int, endBlock *big.Int) error {
-	l.log.Debug("Querying block for deposit events", "block", startBlock)
+	l.log.Debug("Querying block for deposit events", "block", startBlock, "endBlock", endBlock)
 	query := buildQuery(l.cfg.bridgeContract, utils.Deposit, startBlock, endBlock)
 
 	// querying for logs
