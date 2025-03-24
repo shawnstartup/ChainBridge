@@ -22,6 +22,7 @@ import (
 )
 
 var BlockRetryInterval = time.Second * 5
+var BlockNumberTimeout = time.Second * 5
 
 type Connection struct {
 	endpoint      string
@@ -255,9 +256,16 @@ func (c *Connection) UnlockOpts() {
 
 // LatestBlock returns the latest block from the current chain
 func (c *Connection) LatestBlock() (*big.Int, error) {
-	number, err := c.conn.BlockNumber(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), BlockNumberTimeout)
+	defer cancel()
+
+	number, err := c.conn.BlockNumber(ctx)
 	if err != nil {
-		return nil, err
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("LatestBlock DeadlineExceeded :%s", ctx.Err().Error())
+		} else {
+			return nil, err
+		}
 	}
 	return big.NewInt(int64(number)), nil
 }

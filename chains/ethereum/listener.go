@@ -25,7 +25,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-var GetDepositEventsTimeout = time.Second * 5
+var GetDepositEventsTimeout = time.Second * 15
 var BlockRetryInterval = time.Second * 5
 var BlockRetryLimit = 12 * 3
 var ErrFatalPolling = errors.New("listener block polling failed")
@@ -133,8 +133,18 @@ func (l *listener) pollBlocks() error {
 			}
 
 			// Parse out events
-			endBlock := new(big.Int).Add(currentBlock, big.NewInt(int64(l.blockConfirmations.Int64()-1)))
+			var endBlock *big.Int
 			if endBlock.Cmp(latestBlock) == 1 {
+				// ahead <0
+				endBlock = latestBlock
+			} else if big.NewInt(0).Sub(latestBlock, currentBlock).Cmp(big.NewInt(1000)) == 1 {
+				// ahead >1000
+				endBlock = new(big.Int).Add(currentBlock, big.NewInt(int64(1000-1)))
+			} else if big.NewInt(0).Sub(latestBlock, currentBlock).Cmp(big.NewInt(100)) == 1 {
+				// ahead >100
+				endBlock = new(big.Int).Add(currentBlock, big.NewInt(int64(100-1)))
+			} else {
+				//ahead <100
 				endBlock = latestBlock
 			}
 
