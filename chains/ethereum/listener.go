@@ -25,6 +25,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+var GetDepositEventsTimeout = time.Second * 5
 var BlockRetryInterval = time.Second * 5
 var BlockRetryLimit = 12 * 3
 var ErrFatalPolling = errors.New("listener block polling failed")
@@ -182,8 +183,14 @@ func (l *listener) getDepositEventsForBlock(startBlock *big.Int, endBlock *big.I
 	query := buildQuery(l.cfg.bridgeContract, utils.Deposit, startBlock, endBlock)
 
 	// querying for logs
-	logs, err := l.conn.Client().FilterLogs(context.Background(), query)
+	ctx, cancel := context.WithTimeout(context.Background(), GetDepositEventsTimeout)
+	defer cancel()
+
+	logs, err := l.conn.Client().FilterLogs(ctx, query)
 	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			l.log.Error("Querying block for deposit events DeadlineExceeded", "err", err)
+		}
 		return fmt.Errorf("unable to Filter Logs: %w", err)
 	}
 
