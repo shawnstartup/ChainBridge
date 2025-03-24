@@ -193,7 +193,7 @@ func (l *listener) getDepositEventsForBlock(startBlock *big.Int, endBlock *big.I
 		}
 		return fmt.Errorf("unable to Filter Logs: %w", err)
 	}
-	l.log.Debug("Querying block for deposit events", "block", startBlock, "len(logs)", len(logs))
+	l.log.Debug("Querying block for deposit events", "block", startBlock, "endBlock", endBlock, "len(logs)", len(logs))
 
 	// read through the log events and handle their deposit event if handler is recognized
 	for _, log := range logs {
