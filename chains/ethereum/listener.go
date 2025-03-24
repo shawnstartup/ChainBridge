@@ -133,7 +133,7 @@ func (l *listener) pollBlocks() error {
 			}
 
 			// Parse out events
-			var endBlock *big.Int
+			endBlock := new(big.Int).Add(currentBlock, big.NewInt(int64(l.blockConfirmations.Int64()-1)))
 			if endBlock.Cmp(latestBlock) == 1 {
 				// ahead <0
 				endBlock = latestBlock
